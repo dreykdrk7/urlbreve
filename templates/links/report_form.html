@@ -14,6 +14,10 @@
       {% if form.non_field_errors %}
         <div class="form-errors">{{ form.non_field_errors }}</div>
       {% endif %}
+      <div class="honeypot-field" aria-hidden="true">
+        {{ form.contact_website.label_tag }}
+        {{ form.contact_website }}
+      </div>
       <div class="field">
         {{ form.reported_path.label_tag }}
         {{ form.reported_path }}

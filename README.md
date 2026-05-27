@@ -168,8 +168,10 @@ detalles opcionales limitados. Si la ruta corresponde a una URL conocida, el
 reporte queda asociado internamente a esa `ShortURL`; si no se puede resolver,
 se guarda igualmente con `short_url=None` para revision manual.
 
-Los reportes no guardan IP, user-agent, referrer ni email. Tampoco se usa captcha
-externo en esta fase.
+Los reportes no guardan IP, user-agent, referrer ni email. Incluyen un
+honeypot anti-spam silencioso: si se rellena el campo trampa, urlbreve responde
+como si el reporte hubiera sido aceptado, pero no crea `AbuseReport`. No se usa
+captcha externo ni tracking.
 
 En el admin de Django se puede filtrar y revisar `AbuseReport`. Los enlaces
 tienen acciones de moderacion para marcar `is_disabled=True` o volver a
@@ -189,6 +191,7 @@ Límites activos:
 - creación por API key, limitada por usuario resuelto desde `X-API-Key`;
 - creación web autenticada, limitada por `request.user.id`;
 - reportes de abuso, limitados por sesión;
+- honeypot silencioso en reportes de abuso;
 - password gate, limitado por sesión y enlace.
 
 La protección de API anónima es deliberadamente imperfecta: clientes que no
@@ -252,10 +255,11 @@ Microfase actual:
 - enlaces protegidos con contraseña;
 - API mínima de creación con `X-API-Key`;
 - reporte de abuso sin datos personales del visitante;
+- honeypot anti-spam en reportes sin captcha externo;
 - moderacion basica con `is_disabled`;
 - Fase 1 de rate limiting privacy-first sin IP;
 - página inicial y endpoint `/healthz/`;
 - documentación y licencia AGPLv3.
 
-No están implementados todavía honeypot, cooldown avanzado por enlace,
+No están implementados todavía cooldown avanzado por enlace,
 cache compartida/Redis ni la revisión fina de logs del VPS/reverse proxy.

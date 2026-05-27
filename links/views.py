@@ -243,6 +243,11 @@ def render_password_gate(request, form):
 
 def abuse_report(request):
     if request.method == "POST":
+        if (
+            settings.URLBREVE_REPORT_HONEYPOT_ENABLED
+            and request.POST.get("contact_website", "").strip()
+        ):
+            return render(request, "links/report_done.html")
         form = AbuseReportForm(request.POST)
         if form.is_valid():
             limit_result = consume_session_daily_limit(

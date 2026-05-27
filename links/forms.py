@@ -201,6 +201,17 @@ class PasswordGateForm(forms.Form):
 
 
 class AbuseReportForm(forms.Form):
+    contact_website = forms.CharField(
+        label="Sitio web",
+        max_length=200,
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                "autocomplete": "off",
+                "tabindex": "-1",
+            },
+        ),
+    )
     reported_path = forms.CharField(
         label="Ruta reportada",
         max_length=512,
@@ -217,3 +228,6 @@ class AbuseReportForm(forms.Form):
         widget=forms.Textarea(attrs={"rows": 5}),
         help_text="Opcional. No incluyas datos personales.",
     )
+
+    def has_honeypot_value(self) -> bool:
+        return bool(self.cleaned_data.get("contact_website", "").strip())

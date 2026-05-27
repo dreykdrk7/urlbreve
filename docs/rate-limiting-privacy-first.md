@@ -290,13 +290,20 @@ incorrectos. Esta decisión reduce fuerza bruta sin revelar si una contraseña e
 válida. Si se supera el límite, no se comprueba la contraseña, no se redirige y
 no se incrementan estadísticas.
 
+Honeypot en reportes:
+
+- `/report/` incluye un campo honeypot oculto y no persistente.
+- Si `URLBREVE_REPORT_HONEYPOT_ENABLED=True` y el campo llega relleno, la vista
+  responde con la misma pantalla de éxito pero no crea `AbuseReport`.
+- No hay captcha externo, JavaScript obligatorio, tracking ni datos de
+  visitante nuevos.
+
 Limitaciones:
 
 - La API anónima y la creación anónima web se limitan por sesión/cookie.
   Clientes que descartan cookies pueden evadir este límite.
 - El cache local solo coordina límites dentro de una instancia. Varias
   instancias necesitarán cache compartida.
-- No hay honeypot todavía.
 - No hay defensa de infraestructura automatizada todavía.
 
 ## Settings
@@ -312,13 +319,13 @@ proyecto:
   usuarios autenticados.
 - `URLBREVE_API_KEY_DAILY_LIMIT`: límite diario para creación por API key.
 - `URLBREVE_REPORT_SESSION_DAILY_LIMIT`: límite diario de reportes por sesión.
+- `URLBREVE_REPORT_HONEYPOT_ENABLED`: activa honeypot silencioso en `/report/`.
 - `URLBREVE_PASSWORD_GATE_SESSION_LIMIT`: intentos por sesión antes de cooldown.
 
 Los límites numéricos `<= 0` se tratan como ilimitados para esa capa concreta.
 
 Settings propuestos para fases posteriores:
 
-- `URLBREVE_REPORT_HONEYPOT_ENABLED`: activa honeypot en formularios públicos.
 - `URLBREVE_PRIVACY_PRESERVING_IP_BUCKETS_ENABLED`: activaría buckets HMAC
   temporales basados en IP. Sigue siendo opcional, sensible y desactivado por
   defecto.
@@ -346,7 +353,9 @@ Estado: implementada.
 
 ### Fase 2: honeypot y cooldown por enlace
 
-- Añadir campo honeypot a `/report/`.
+Estado: honeypot de `/report/` implementado; cooldown avanzado pendiente.
+
+- Añadir campo honeypot a `/report/`. Implementado.
 - Añadir cooldown por `ShortURL.id` para intentos de password gate.
 - Añadir límites por `reported_path` para reportes repetidos.
 - Mantener respuestas genéricas y sin datos de visitante.

@@ -642,6 +642,32 @@ class AbuseReportTests(TestCase):
         self.assertFalse(hasattr(report, "user_agent"))
         self.assertFalse(hasattr(report, "email"))
 
+    def test_report_honeypot_silently_accepts_without_creating_report(self):
+        normal_response = self.post_report(details="Human report.")
+        honeypot_response = self.post_report(
+            reported_path="/a/another/",
+            contact_website="https://spam.example",
+        )
+
+        self.assertEqual(normal_response.status_code, 200)
+        self.assertEqual(honeypot_response.status_code, 200)
+        self.assertContains(normal_response, "Reporte recibido")
+        self.assertContains(honeypot_response, "Reporte recibido")
+        self.assertEqual(AbuseReport.objects.count(), 1)
+
+    @override_settings(URLBREVE_REPORT_HONEYPOT_ENABLED=False)
+    def test_report_honeypot_can_be_disabled(self):
+        response = self.post_report(contact_website="https://example.com")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Reporte recibido")
+        self.assertEqual(AbuseReport.objects.count(), 1)
+
+    def test_honeypot_field_is_not_persistent(self):
+        field_names = {field.name for field in AbuseReport._meta.fields}
+
+        self.assertNotIn("contact_website", field_names)
+
     def test_anonymous_report_path_resolves_short_url(self):
         short_url = self.create_short_url(slug="anon-report")
 

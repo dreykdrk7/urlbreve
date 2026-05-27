@@ -176,8 +176,11 @@ templates. El formulario pide solo:
 - `details`, opcional y limitado.
 
 No se solicita email ni se persisten IP, user-agent, referrer u otros datos del
-visitante. En esta fase tampoco se integra captcha externo para evitar
-dependencias y tracking de terceros.
+visitante. El formulario incluye un campo honeypot no persistente y oculto para
+usuarios normales. Si `URLBREVE_REPORT_HONEYPOT_ENABLED=True` y el campo llega
+relleno, la vista devuelve la misma pantalla de reporte recibido pero no crea
+`AbuseReport`. No se integra captcha externo para evitar dependencias y tracking
+de terceros.
 
 Al recibir un reporte, `links.services.resolve_reported_path()` normaliza la
 ruta e intenta resolver:
@@ -324,11 +327,12 @@ Settings actuales:
 - `URLBREVE_AUTHENTICATED_DAILY_LIMIT`;
 - `URLBREVE_API_KEY_DAILY_LIMIT`;
 - `URLBREVE_REPORT_SESSION_DAILY_LIMIT`;
+- `URLBREVE_REPORT_HONEYPOT_ENABLED`;
 - `URLBREVE_PASSWORD_GATE_SESSION_LIMIT`.
 
-Siguen pendientes honeypot en `/report/`, cooldown avanzado por enlace, Redis o
-cache compartida para varias instancias y protección temporal de infraestructura
-sin access logs persistentes.
+Siguen pendientes cooldown avanzado por enlace, Redis o cache compartida para
+varias instancias y protección temporal de infraestructura sin access logs
+persistentes.
 
 ## Decisiones pendientes
 
