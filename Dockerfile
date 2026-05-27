@@ -7,8 +7,12 @@ WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN groupadd --system app && useradd --system --gid app --home /app app
 
 COPY . .
+
+RUN mkdir -p /app/staticfiles && chown -R app:app /app
+USER app
 
 RUN python manage.py collectstatic --noinput
 

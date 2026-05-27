@@ -378,6 +378,12 @@ Settings actuales:
 - `DJANGO_SESSION_COOKIE_SECURE`;
 - `DJANGO_CSRF_COOKIE_SECURE`;
 - `DJANGO_SECURE_SSL_REDIRECT`;
+- `DJANGO_SECURE_HSTS_SECONDS`;
+- `DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS`;
+- `DJANGO_SECURE_HSTS_PRELOAD`;
+- `DJANGO_REFERRER_POLICY`;
+- `DJANGO_DATA_UPLOAD_MAX_MEMORY_SIZE`;
+- `DJANGO_FILE_UPLOAD_MAX_MEMORY_SIZE`;
 - `URLBREVE_ANONYMOUS_API_ENABLED`;
 - `URLBREVE_RATE_LIMITING_ENABLED`;
 - `URLBREVE_ANONYMOUS_DAILY_LIMIT`;
@@ -408,10 +414,12 @@ Decisiones:
 - solo nginx expone puerto público;
 - PostgreSQL no expone puertos al host;
 - Gunicorn queda detrás de nginx en red interna de Compose;
+- Gunicorn usa un worker hasta que haya cache compartida para rate limiting;
 - staticfiles se comparten mediante volumen Docker;
 - nginx sirve `/static/`;
 - nginx no escribe access logs;
 - nginx no reenvía IP, user-agent ni referrer de visitante a Django;
+- la imagen de Django se ejecuta con usuario no root;
 - TLS queda documentado como capa externa o extensión futura del stack.
 
 ## Decisiones pendientes

@@ -60,6 +60,10 @@ Variables importantes:
 - `DJANGO_CSRF_COOKIE_SECURE=True` con HTTPS.
 - `DJANGO_SECURE_SSL_REDIRECT`: ponlo en `True` solo cuando tu proxy TLS envíe
   correctamente `X-Forwarded-Proto=https`.
+- `DJANGO_SECURE_HSTS_SECONDS`: empieza en `0`; usa un valor alto solo cuando
+  HTTPS esté estable.
+- `DJANGO_DATA_UPLOAD_MAX_MEMORY_SIZE` y `DJANGO_FILE_UPLOAD_MAX_MEMORY_SIZE`:
+  límites defensivos para formularios y JSON.
 
 Si la contraseña de PostgreSQL contiene caracteres especiales, codifícala para
 URL en `DATABASE_URL`.
@@ -130,6 +134,8 @@ Para producción real:
 - usa `DJANGO_CSRF_COOKIE_SECURE=True`;
 - activa `DJANGO_SECURE_SSL_REDIRECT=True` cuando Django reciba
   `X-Forwarded-Proto=https` de forma fiable.
+- activa HSTS más adelante, por ejemplo `DJANGO_SECURE_HSTS_SECONDS=31536000`,
+  solo cuando el dominio funcione siempre por HTTPS.
 
 ## Nginx privacy-first
 
@@ -138,7 +144,7 @@ La configuración vive en `deploy/nginx/urlbreve.conf`.
 Decisiones:
 
 - `access_log off;` para no persistir IPs ni rutas visitadas;
-- nivel de `error_log` reducido;
+- `error_log` en nivel `crit` para reducir metadatos en logs de nginx;
 - no se reenvían `X-Forwarded-For`, `X-Real-IP`, `Forwarded`, `User-Agent` ni
   `Referer` a Django;
 - se reenvían `Host` y `X-Forwarded-Proto` para construir URLs correctas;
@@ -162,6 +168,10 @@ docker compose --env-file .env.production -f docker-compose.prod.yml logs db
 
 No actives access logs de nginx ni Gunicorn en operación normal. Los logs de
 errores pueden contener contexto técnico; revisa retención y acceso en el VPS.
+
+La configuración incluida ejecuta Gunicorn con un solo worker mientras el rate
+limiting use cache local en memoria. Si aumentas workers, réplicas o instancias,
+añade antes un backend de cache compartido como Redis.
 
 ## Backups PostgreSQL
 

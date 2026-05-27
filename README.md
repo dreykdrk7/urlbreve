@@ -303,4 +303,5 @@ Microfase actual:
 
 No están implementados todavía cache compartida/Redis, límites por
 `reported_path`, bloqueo futuro de dominios abusivos ni la revisión fina de logs
-del VPS/reverse proxy.
+del VPS/reverse proxy. La configuración de producción usa un worker de Gunicorn
+mientras el rate limiting dependa de cache local.

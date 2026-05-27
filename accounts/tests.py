@@ -1,6 +1,8 @@
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
+
+from config.settings import database_from_url
 
 from .models import UserProfile
 from .services import (
@@ -12,6 +14,20 @@ from .services import (
 
 
 User = get_user_model()
+
+
+class SettingsParsingTests(SimpleTestCase):
+    def test_database_url_decodes_percent_encoded_credentials(self):
+        config = database_from_url(
+            "postgres://urlbreve:p%40ss%2Fword@db:5432/urlbreve_prod?sslmode=require",
+        )
+
+        self.assertEqual(config["NAME"], "urlbreve_prod")
+        self.assertEqual(config["USER"], "urlbreve")
+        self.assertEqual(config["PASSWORD"], "p@ss/word")
+        self.assertEqual(config["HOST"], "db")
+        self.assertEqual(config["PORT"], "5432")
+        self.assertEqual(config["OPTIONS"], {"sslmode": "require"})
 
 
 class RegistrationTests(TestCase):

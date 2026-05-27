@@ -5,8 +5,10 @@ load a local .env file at runtime; .env.example is documentation for operators.
 """
 
 from pathlib import Path
-from urllib.parse import parse_qsl, urlparse
+from urllib.parse import parse_qsl, unquote, urlparse
 import os
+
+from django.core.exceptions import ImproperlyConfigured
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -42,9 +44,9 @@ def database_from_url(url: str) -> dict[str, object]:
     options = dict(parse_qsl(parsed.query))
     config: dict[str, object] = {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": parsed.path.lstrip("/"),
-        "USER": parsed.username or "",
-        "PASSWORD": parsed.password or "",
+        "NAME": unquote(parsed.path.lstrip("/")),
+        "USER": unquote(parsed.username or ""),
+        "PASSWORD": unquote(parsed.password or ""),
         "HOST": parsed.hostname or "",
         "PORT": str(parsed.port or 5432),
     }
@@ -55,6 +57,13 @@ def database_from_url(url: str) -> dict[str, object]:
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "insecure-dev-key-change-me")
 DEBUG = env_bool("DJANGO_DEBUG", default=True)
+if not DEBUG and (
+    not SECRET_KEY
+    or SECRET_KEY == "insecure-dev-key-change-me"
+    or SECRET_KEY.startswith("CHANGE_ME")
+):
+    raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set for production.")
+
 ALLOWED_HOSTS = env_list(
     "DJANGO_ALLOWED_HOSTS",
     default="localhost,127.0.0.1,0.0.0.0,testserver",
@@ -64,6 +73,16 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_SECURE = env_bool("DJANGO_SESSION_COOKIE_SECURE", default=False)
 CSRF_COOKIE_SECURE = env_bool("DJANGO_CSRF_COOKIE_SECURE", default=False)
 SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", default=False)
+SECURE_HSTS_SECONDS = env_int("DJANGO_SECURE_HSTS_SECONDS", 0)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool(
+    "DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS",
+    default=False,
+)
+SECURE_HSTS_PRELOAD = env_bool("DJANGO_SECURE_HSTS_PRELOAD", default=False)
+SECURE_CONTENT_TYPE_NOSNIFF = True
+REFERRER_POLICY = os.environ.get("DJANGO_REFERRER_POLICY", "no-referrer")
+DATA_UPLOAD_MAX_MEMORY_SIZE = env_int("DJANGO_DATA_UPLOAD_MAX_MEMORY_SIZE", 1024 * 1024)
+FILE_UPLOAD_MAX_MEMORY_SIZE = env_int("DJANGO_FILE_UPLOAD_MAX_MEMORY_SIZE", 1024 * 1024)
 
 URLBREVE_ANONYMOUS_API_ENABLED = env_bool(
     "URLBREVE_ANONYMOUS_API_ENABLED",

@@ -314,8 +314,9 @@ Limitaciones:
 
 - La API anónima y la creación anónima web se limitan por sesión/cookie.
   Clientes que descartan cookies pueden evadir este límite.
-- El cache local solo coordina límites dentro de una instancia. Varias
-  instancias necesitarán cache compartida.
+- El cache local solo coordina límites dentro de un proceso. La configuración
+  de producción usa un worker de Gunicorn hasta que exista cache compartida.
+  Varias instancias, réplicas o workers necesitarán Redis u otro backend común.
 - No hay defensa de infraestructura automatizada todavía.
 
 ## Settings
