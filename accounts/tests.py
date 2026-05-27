@@ -3,6 +3,12 @@ from django.test import TestCase
 from django.urls import reverse
 
 from .models import UserProfile
+from .services import (
+    generate_api_key,
+    get_user_for_api_key,
+    hash_api_key,
+    verify_api_key,
+)
 
 
 User = get_user_model()
@@ -118,3 +124,46 @@ class ProfileEditTests(TestCase):
             "public_namespace",
             "This namespace is already taken or reserved.",
         )
+
+
+class APIKeyTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="dora", password="StrongPass123")
+        self.profile = UserProfile.objects.create(
+            user=self.user,
+            public_namespace="dora",
+        )
+        self.client.login(username="dora", password="StrongPass123")
+
+    def test_api_key_helpers_hash_verify_and_resolve_user(self):
+        raw_key = generate_api_key()
+        key_hash = hash_api_key(raw_key)
+        self.profile.api_key_hash = key_hash
+        self.profile.save(update_fields=["api_key_hash"])
+
+        self.assertTrue(raw_key.startswith("ub_"))
+        self.assertNotEqual(raw_key, key_hash)
+        self.assertTrue(verify_api_key(raw_key, key_hash))
+        self.assertFalse(verify_api_key("wrong", key_hash))
+        self.assertEqual(get_user_for_api_key(raw_key), self.user)
+
+    def test_rotate_api_key_shows_raw_key_once(self):
+        response = self.client.post(reverse("accounts:api_key_rotate"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ub_")
+        self.profile.refresh_from_db()
+        self.assertTrue(self.profile.api_key_hash)
+
+        followup = self.client.get(reverse("accounts:profile_edit"))
+        self.assertNotContains(followup, "ub_")
+
+    def test_revoke_api_key_clears_hash(self):
+        self.profile.api_key_hash = hash_api_key(generate_api_key())
+        self.profile.save(update_fields=["api_key_hash"])
+
+        response = self.client.post(reverse("accounts:api_key_revoke"))
+
+        self.assertRedirects(response, reverse("accounts:profile_edit"))
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.api_key_hash, "")

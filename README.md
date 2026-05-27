@@ -67,10 +67,13 @@ docker compose run --rm web python manage.py test
 - `/logout/` - logout mediante POST.
 - `/dashboard/` - panel privado mínimo.
 - `/profile/` - edición del perfil básico.
+- `/profile/api-key/rotate/` - rotación de API key mediante POST.
+- `/profile/api-key/revoke/` - revocación de API key mediante POST.
 - `/links/new/` - creación autenticada de URL corta.
 - `/links/<id>/` - detalle básico de una URL propia.
 - `/links/<id>/edit/` - edición de campos permitidos.
 - `/links/<id>/delete/` - ocultado mediante soft delete.
+- `/api/shorten/` - creación de URL corta mediante API JSON.
 - `/a/<slug>/` - redirección pública anónima/global.
 - `/<namespace>/<slug>/` - redirección pública bajo namespace.
 - `/healthz/` - healthcheck.
@@ -140,6 +143,47 @@ contadores agregados:
 No se guardan IPs, user-agent, referrer ni datos de tracking del visitante.
 El password gate tampoco guarda datos del visitante ni registra intentos.
 
+## API
+
+`POST /api/shorten/` acepta JSON y responde JSON. Sin `X-API-Key`, crea una URL
+anónima/global sin owner y fuerza `public_mode=anonymous`.
+
+Con `X-API-Key` válida, crea la URL asociada al usuario dueño de la clave. En
+ese caso `public_mode` puede ser `anonymous` o `namespace`.
+
+La API key se gestiona desde `/profile/`. Solo se muestra en claro al generarla
+o rotarla; después se guarda únicamente `UserProfile.api_key_hash`. Revocarla
+borra ese hash.
+
+Ejemplo anónimo:
+
+```bash
+curl -X POST http://localhost:8000/api/shorten/ \
+  -H "Content-Type: application/json" \
+  -d '{"destination_url":"https://example.com","slug":"ejemplo"}'
+```
+
+Ejemplo con API key:
+
+```bash
+curl -X POST http://localhost:8000/api/shorten/ \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: ub_tu_clave" \
+  -d '{"destination_url":"https://example.com","public_mode":"namespace"}'
+```
+
+Campos admitidos:
+
+- `destination_url`, requerido, solo `http://` o `https://`;
+- `slug`, opcional;
+- `title`, opcional;
+- `public_mode`, opcional;
+- `expires_days`, opcional, `0` por defecto;
+- `max_clicks`, opcional, `0` por defecto;
+- `password`, opcional.
+
+La API no guarda IPs, user-agent, referrer ni API keys en claro.
+
 ## Estado
 
 Microfase actual:
@@ -153,8 +197,9 @@ Microfase actual:
 - creación, listado, detalle, edición limitada y soft delete de URLs propias;
 - redirecciones públicas con contador agregado diario;
 - enlaces protegidos con contraseña;
+- API mínima de creación con `X-API-Key`;
 - página inicial y endpoint `/healthz/`;
 - documentación y licencia AGPLv3.
 
-No están implementadas todavía la API pública, reporte de abuso ni el rate
-limiting.
+No están implementados todavía reporte de abuso, rate limiting ni revisión fina
+de logs del VPS/reverse proxy.

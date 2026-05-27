@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 
 from .forms import RegistrationForm, UserProfileForm
-from .services import ensure_user_profile
+from .services import ensure_user_profile, generate_api_key, hash_api_key
 
 
 def register(request):
@@ -56,4 +56,36 @@ def profile_edit(request):
     else:
         form = UserProfileForm(instance=profile)
 
-    return render(request, "accounts/profile_form.html", {"form": form})
+    return render(request, "accounts/profile_form.html", {"form": form, "profile": profile})
+
+
+@login_required
+def api_key_rotate(request):
+    if request.method != "POST":
+        return redirect("accounts:profile_edit")
+
+    profile = ensure_user_profile(request.user)
+    raw_key = generate_api_key()
+    profile.api_key_hash = hash_api_key(raw_key)
+    profile.save(update_fields=["api_key_hash", "updated_at"])
+    form = UserProfileForm(instance=profile)
+    messages.success(request, "API key generada. Guardala ahora; no volvera a mostrarse.")
+    return render(
+        request,
+        "accounts/profile_form.html",
+        {
+            "form": form,
+            "profile": profile,
+            "new_api_key": raw_key,
+        },
+    )
+
+
+@login_required
+def api_key_revoke(request):
+    if request.method == "POST":
+        profile = ensure_user_profile(request.user)
+        profile.api_key_hash = ""
+        profile.save(update_fields=["api_key_hash", "updated_at"])
+        messages.success(request, "API key revocada.")
+    return redirect("accounts:profile_edit")

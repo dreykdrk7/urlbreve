@@ -1,9 +1,14 @@
+from django.contrib.auth.hashers import check_password, make_password
 from django.db import IntegrityError, transaction
 import re
+import secrets
 import unicodedata
 
 from .models import UserProfile
 from .validators import RESERVED_NAMESPACES, SAFE_NAMESPACE_RE
+
+
+API_KEY_PREFIX = "ub_"
 
 
 def normalize_public_namespace(value: str) -> str:
@@ -65,3 +70,28 @@ def ensure_user_profile(user) -> UserProfile:
         profile.public_namespace = generate_unique_public_namespace(user.get_username())
         profile.save(update_fields=["public_namespace", "updated_at"])
     return profile
+
+
+def generate_api_key() -> str:
+    return f"{API_KEY_PREFIX}{secrets.token_urlsafe(32)}"
+
+
+def hash_api_key(raw_key: str) -> str:
+    return make_password(raw_key)
+
+
+def verify_api_key(raw_key: str, api_key_hash: str) -> bool:
+    if not raw_key or not api_key_hash:
+        return False
+    return check_password(raw_key, api_key_hash)
+
+
+def get_user_for_api_key(raw_key: str):
+    if not raw_key:
+        return None
+
+    profiles = UserProfile.objects.exclude(api_key_hash="").select_related("user")
+    for profile in profiles.iterator():
+        if verify_api_key(raw_key, profile.api_key_hash):
+            return profile.user
+    return None

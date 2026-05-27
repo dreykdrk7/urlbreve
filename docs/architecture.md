@@ -8,20 +8,23 @@
 - `/logout/` - logout mediante POST.
 - `/dashboard/` - panel privado mínimo.
 - `/profile/` - edición de perfil básico.
+- `/profile/api-key/rotate/` - rotación de API key mediante POST.
+- `/profile/api-key/revoke/` - revocación de API key mediante POST.
 - `/links/new/` - creación autenticada de URL corta.
 - `/links/<id>/` - detalle básico de URL propia.
 - `/links/<id>/edit/` - edición de campos permitidos.
 - `/links/<id>/delete/` - ocultado mediante soft delete.
 - `/a/<slug>/` - redirección pública anónima/global.
 - `/<namespace>/<slug>/` - redirección pública bajo namespace de usuario.
-- `/api/shorten/` - futuro endpoint API.
+- `/api/shorten/` - creación de URL corta por API JSON.
 - `/admin/` - administración de Django.
 - `/healthz/` - healthcheck básico.
 
 En esta microfase están activos `/`, `/register/`, `/login/`, `/logout/`,
-`/dashboard/`, `/profile/`, `/links/new/`, `/links/<id>/`,
+`/dashboard/`, `/profile/`, `/profile/api-key/rotate/`,
+`/profile/api-key/revoke/`, `/links/new/`, `/links/<id>/`,
 `/links/<id>/edit/`, `/links/<id>/delete/`, `/a/<slug>/`,
-`/<namespace>/<slug>/`, `/healthz/` y `/admin/`.
+`/<namespace>/<slug>/`, `/api/shorten/`, `/healthz/` y `/admin/`.
 
 ## Modelo de privacidad
 
@@ -138,6 +141,58 @@ correcta, se registra únicamente:
 No se guardan IPs, user-agent ni referrer en el modelo de estadísticas. Tampoco
 se guardan intentos fallidos del password gate.
 
+## API pública inicial
+
+`POST /api/shorten/` usa Django puro y `JsonResponse`. No se introduce Django
+REST Framework en esta fase.
+
+Autenticación:
+
+- sin `X-API-Key`, la creación es anónima, `owner=None` y
+  `public_mode=anonymous`;
+- con `X-API-Key` válida, la creación queda asociada al usuario dueño de la
+  clave;
+- con `X-API-Key` inválida, se devuelve `401` genérico;
+- `public_mode=namespace` requiere una API key válida.
+
+`UserProfile.api_key_hash` guarda solo el hash de la clave. La clave en claro se
+muestra una sola vez al generarla o rotarla desde `/profile/`. Revocar la clave
+deja `api_key_hash` vacío.
+
+Payload admitido:
+
+- `destination_url`, requerido;
+- `slug`, opcional;
+- `title`, opcional;
+- `public_mode`, opcional;
+- `expires_days`, opcional, entero `>= 0`;
+- `max_clicks`, opcional, entero `>= 0`;
+- `password`, opcional.
+
+Validaciones:
+
+- `destination_url` solo admite `http://` o `https://`;
+- slug manual usa la misma regla ASCII conservadora que la UI;
+- slug vacío genera código aleatorio de 8 caracteres;
+- colisiones devuelven `409` con sugerencias;
+- JSON inválido o campos inválidos devuelven `400`;
+- métodos distintos de POST devuelven `405`.
+
+Respuesta exitosa `201`:
+
+- `id`;
+- `short_url`;
+- `public_path`;
+- `destination_url`;
+- `title`;
+- `public_mode`;
+- `expires_at`;
+- `max_clicks`;
+- `password_protected`.
+
+La API no guarda IP, user-agent, referrer ni API keys en claro. Tampoco devuelve
+`api_key_hash`.
+
 ## Registro y perfil
 
 El registro usa `django.contrib.auth` y un formulario propio sobre
@@ -182,19 +237,6 @@ Existe `links.validators.suggest_slug_variants()` como helper preparado para
 sugerir variantes cuando haya colisión. En la creación autenticada se usa para
 mostrar alternativas cuando un slug manual ya existe.
 
-## API futura
-
-La API pública prevista empezará por `/api/shorten/`. La autenticación podrá usar
-`X-API-Key`, guardando solo `UserProfile.api_key_hash`; nunca se debe almacenar
-la clave en claro.
-
-Pendiente:
-
-- formato de request/response;
-- rotación de claves;
-- permisos por usuario;
-- límites de uso compatibles con la política privacy-first.
-
 ## Rate limiting pendiente
 
 El rate limiting queda fuera de esta microfase. Debe diseñarse sin introducir
@@ -211,4 +253,4 @@ tracking invasivo. Opciones a evaluar:
 - formulario o proceso de reporte de abuso;
 - política exacta de logs en reverse proxy;
 - borrado lógico frente a reutilización futura de slugs;
-- endpoints de API y documentación pública.
+- límites de uso compatibles con la política privacy-first.

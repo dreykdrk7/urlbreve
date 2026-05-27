@@ -6,8 +6,10 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 from datetime import timedelta
+import json
 
 from accounts.models import UserProfile
+from accounts.services import hash_api_key
 
 from .models import ShortURL, ShortURLDailyStats
 from .validators import suggest_slug_variants, validate_http_https_url, validate_safe_slug
@@ -500,3 +502,165 @@ class PublicRedirectTests(TestCase):
             "https://example.com/namespaced",
             fetch_redirect_response=False,
         )
+
+
+class ShortenAPITests(TestCase):
+    def create_user_with_api_key(self, username: str = "apiuser"):
+        raw_key = f"ub_test_{username}"
+        user = User.objects.create_user(username=username, password="StrongPass123")
+        UserProfile.objects.create(
+            user=user,
+            public_namespace=username,
+            api_key_hash=hash_api_key(raw_key),
+        )
+        return user, raw_key
+
+    def post_json(self, payload, api_key: str | None = None):
+        headers = {}
+        if api_key:
+            headers["HTTP_X_API_KEY"] = api_key
+        return self.client.post(
+            reverse("api_shorten"),
+            data=json.dumps(payload),
+            content_type="application/json",
+            **headers,
+        )
+
+    def test_anonymous_post_creates_anonymous_url_without_owner(self):
+        response = self.post_json(
+            {
+                "destination_url": "https://example.com/api",
+                "slug": "apiAnon",
+            }
+        )
+
+        self.assertEqual(response.status_code, 201)
+        short_url = ShortURL.objects.get(slug="apiAnon")
+        self.assertIsNone(short_url.owner)
+        self.assertEqual(short_url.public_mode, ShortURL.PublicMode.ANONYMOUS)
+        payload = response.json()
+        self.assertEqual(payload["public_path"], "/a/apiAnon/")
+
+    def test_anonymous_namespace_mode_returns_forbidden(self):
+        response = self.post_json(
+            {
+                "destination_url": "https://example.com/api",
+                "public_mode": ShortURL.PublicMode.NAMESPACE,
+            }
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_valid_api_key_creates_owned_anonymous_url(self):
+        user, raw_key = self.create_user_with_api_key("owned")
+
+        response = self.post_json(
+            {
+                "destination_url": "https://example.com/api",
+                "slug": "owned1",
+            },
+            api_key=raw_key,
+        )
+
+        self.assertEqual(response.status_code, 201)
+        short_url = ShortURL.objects.get(slug="owned1")
+        self.assertEqual(short_url.owner, user)
+        self.assertEqual(short_url.public_mode, ShortURL.PublicMode.ANONYMOUS)
+
+    def test_valid_api_key_creates_namespaced_url(self):
+        user, raw_key = self.create_user_with_api_key("spaceuser")
+
+        response = self.post_json(
+            {
+                "destination_url": "https://example.com/api",
+                "slug": "space1",
+                "public_mode": ShortURL.PublicMode.NAMESPACE,
+            },
+            api_key=raw_key,
+        )
+
+        self.assertEqual(response.status_code, 201)
+        short_url = ShortURL.objects.get(slug="space1")
+        self.assertEqual(short_url.owner, user)
+        self.assertEqual(short_url.public_mode, ShortURL.PublicMode.NAMESPACE)
+        self.assertEqual(response.json()["public_path"], "/spaceuser/space1/")
+
+    def test_invalid_api_key_returns_unauthorized(self):
+        response = self.post_json(
+            {"destination_url": "https://example.com/api"},
+            api_key="ub_wrong",
+        )
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_get_method_returns_method_not_allowed(self):
+        response = self.client.get(reverse("api_shorten"))
+
+        self.assertEqual(response.status_code, 405)
+        self.assertEqual(response["Allow"], "POST")
+
+    def test_invalid_json_returns_bad_request(self):
+        response = self.client.post(
+            reverse("api_shorten"),
+            data="{bad",
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_destination_url_must_be_http_or_https(self):
+        response = self.post_json({"destination_url": "ftp://example.com/file"})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(ShortURL.objects.count(), 0)
+
+    def test_slug_collision_returns_conflict_with_suggestions(self):
+        ShortURL.objects.create(
+            destination_url="https://example.com/one",
+            slug="taken",
+            public_mode=ShortURL.PublicMode.ANONYMOUS,
+        )
+
+        response = self.post_json(
+            {
+                "destination_url": "https://example.com/two",
+                "slug": "taken",
+            }
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("taken-2", response.json()["suggestions"])
+
+    def test_password_optional_hashes_and_response_marks_protected(self):
+        response = self.post_json(
+            {
+                "destination_url": "https://example.com/api",
+                "slug": "secret1",
+                "password": "secret",
+            }
+        )
+
+        self.assertEqual(response.status_code, 201)
+        short_url = ShortURL.objects.get(slug="secret1")
+        self.assertTrue(short_url.password_hash)
+        self.assertNotEqual(short_url.password_hash, "secret")
+        self.assertTrue(response.json()["password_protected"])
+
+    def test_empty_slug_generates_random_code(self):
+        response = self.post_json({"destination_url": "https://example.com/api"})
+
+        self.assertEqual(response.status_code, 201)
+        short_url = ShortURL.objects.get()
+        self.assertEqual(len(short_url.slug), 8)
+
+    def test_revoke_api_key_prevents_owned_creation(self):
+        user, raw_key = self.create_user_with_api_key("revoked")
+        user.profile.api_key_hash = ""
+        user.profile.save(update_fields=["api_key_hash"])
+
+        response = self.post_json(
+            {"destination_url": "https://example.com/api"},
+            api_key=raw_key,
+        )
+
+        self.assertEqual(response.status_code, 401)

@@ -19,4 +19,6 @@ urlpatterns = [
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("dashboard/", views.dashboard, name="dashboard"),
     path("profile/", views.profile_edit, name="profile_edit"),
+    path("profile/api-key/rotate/", views.api_key_rotate, name="api_key_rotate"),
+    path("profile/api-key/revoke/", views.api_key_revoke, name="api_key_revoke"),
 ]

@@ -30,4 +30,40 @@
       </div>
     </form>
   </section>
+
+  <section class="panel">
+    <h1>API key</h1>
+    {% if new_api_key %}
+      <div class="empty-state">
+        <p class="profile-label">Clave nueva</p>
+        <p class="profile-value">{{ new_api_key }}</p>
+      </div>
+    {% endif %}
+    <p class="lead">
+      Usa X-API-Key para crear URLs asociadas a tu cuenta. La clave solo se
+      muestra al generarla.
+    </p>
+    <div class="profile-grid">
+      <div class="profile-item">
+        <p class="profile-label">Estado</p>
+        <p class="profile-value">
+          {% if profile.api_key_hash %}Activa{% else %}Sin clave{% endif %}
+        </p>
+      </div>
+    </div>
+    <div class="actions">
+      <form class="logout-form" method="post" action="{% url 'accounts:api_key_rotate' %}">
+        {% csrf_token %}
+        <button class="button" type="submit">
+          {% if profile.api_key_hash %}Rotar clave{% else %}Generar clave{% endif %}
+        </button>
+      </form>
+      {% if profile.api_key_hash %}
+        <form class="logout-form" method="post" action="{% url 'accounts:api_key_revoke' %}">
+          {% csrf_token %}
+          <button class="button warning" type="submit">Revocar clave</button>
+        </form>
+      {% endif %}
+    </div>
+  </section>
 {% endblock %}
