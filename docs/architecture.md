@@ -270,17 +270,28 @@ mostrar alternativas cuando un slug manual ya existe.
 
 ## Rate limiting pendiente
 
-El rate limiting queda fuera de esta microfase. Debe diseñarse sin introducir
-tracking invasivo. Opciones a evaluar:
+El rate limiting runtime queda fuera de esta microfase. El diseño inicial está
+en `docs/rate-limiting-privacy-first.md` y debe implementarse sin introducir
+tracking invasivo.
+
+Capas recomendadas:
 
 - límites por usuario autenticado;
-- cuotas por API key hasheada;
-- protección anti-abuse a nivel de infraestructura con ventanas cortas;
-- mecanismos anónimos que no requieran almacenar IPs crudas.
+- límites por usuario resuelto desde `X-API-Key`;
+- límites por sesión Django para flujos web públicos;
+- honeypot simple en `/report/`;
+- cooldown por enlace para password gate;
+- cache local o Redis según número de instancias;
+- protección anti-abuse temporal a nivel de infraestructura, sin access logs
+  persistentes.
+
+La API anónima debería ser desactivable por setting o tener un límite muy bajo.
+Los buckets HMAC temporales basados en IP quedan documentados como opción
+sensible, opcional y desactivada por defecto.
 
 ## Decisiones pendientes
 
 - flujo de creación anónima;
 - política exacta de logs en reverse proxy;
 - borrado lógico frente a reutilización futura de slugs;
-- límites de uso compatibles con la política privacy-first.
+- implementación runtime de límites compatibles con la política privacy-first.

@@ -160,6 +160,17 @@ tienen acciones de moderacion para marcar `is_disabled=True` o volver a
 habilitarlos. Un enlace deshabilitado queda bloqueado por las mismas reglas de
 disponibilidad de las redirecciones publicas.
 
+## Rate limiting y anti-abuse
+
+El rate limiting sigue pendiente de implementación. La estrategia de diseño está
+documentada en `docs/rate-limiting-privacy-first.md` y prioriza límites por
+usuario, API key y sesión antes de considerar señales sensibles como IP.
+
+La recomendación inicial es poder desactivar o limitar fuertemente la API
+anónima, aplicar límites fuertes a API keys y usuarios autenticados, añadir
+honeypot en reportes, limitar el password gate por sesión y reservar defensas de
+infraestructura efímeras para ataques activos.
+
 ## API
 
 `POST /api/shorten/` acepta JSON y responde JSON. Sin `X-API-Key`, crea una URL
@@ -217,8 +228,9 @@ Microfase actual:
 - API mínima de creación con `X-API-Key`;
 - reporte de abuso sin datos personales del visitante;
 - moderacion basica con `is_disabled`;
+- diseño documentado para rate limiting privacy-first;
 - página inicial y endpoint `/healthz/`;
 - documentación y licencia AGPLv3.
 
-No están implementados todavía rate limiting ni revisión fina de logs del
-VPS/reverse proxy.
+No están implementados todavía el rate limiting runtime ni la revisión fina de
+logs del VPS/reverse proxy.
