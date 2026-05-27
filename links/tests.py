@@ -741,6 +741,16 @@ class ShortenAPITests(TestCase):
         )
         return user, raw_key
 
+    def create_short_url(self, owner=None, **overrides):
+        data = {
+            "owner": owner,
+            "destination_url": "https://example.com/page",
+            "slug": "api-list",
+            "public_mode": ShortURL.PublicMode.ANONYMOUS,
+        }
+        data.update(overrides)
+        return ShortURL.objects.create(**data)
+
     def post_json(self, payload, api_key: str | None = None):
         headers = {}
         if api_key:
@@ -751,6 +761,12 @@ class ShortenAPITests(TestCase):
             content_type="application/json",
             **headers,
         )
+
+    def get_api_links(self, api_key: str | None = None, params=None):
+        headers = {}
+        if api_key:
+            headers["HTTP_X_API_KEY"] = api_key
+        return self.client.get(reverse("api_links"), data=params or {}, **headers)
 
     def test_anonymous_post_creates_anonymous_url_without_owner(self):
         response = self.post_json(
@@ -819,6 +835,171 @@ class ShortenAPITests(TestCase):
 
         self.assertEqual(response.status_code, 401)
 
+    def test_links_listing_requires_api_key(self):
+        response = self.get_api_links()
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_links_listing_rejects_invalid_api_key(self):
+        response = self.get_api_links(api_key="ub_wrong")
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_links_listing_returns_only_urls_owned_by_api_user(self):
+        user, raw_key = self.create_user_with_api_key("listowner")
+        other_user, _ = self.create_user_with_api_key("otherowner")
+        self.create_short_url(owner=user, slug="mine1")
+        self.create_short_url(owner=user, slug="mine2")
+        self.create_short_url(owner=None, slug="anonowned")
+        self.create_short_url(owner=other_user, slug="theirs")
+
+        response = self.get_api_links(api_key=raw_key)
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        slugs = {item["slug"] for item in payload["results"]}
+        self.assertEqual(slugs, {"mine1", "mine2"})
+        self.assertEqual(payload["count"], 2)
+
+    def test_links_listing_filters_by_destination_url(self):
+        user, raw_key = self.create_user_with_api_key("destfilter")
+        self.create_short_url(
+            owner=user,
+            slug="dest1",
+            destination_url="https://example.com/one",
+        )
+        self.create_short_url(
+            owner=user,
+            slug="dest2",
+            destination_url="https://example.com/two",
+        )
+
+        response = self.get_api_links(
+            api_key=raw_key,
+            params={"destination_url": "https://example.com/two"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        results = response.json()["results"]
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["slug"], "dest2")
+
+    def test_links_listing_filters_by_slug(self):
+        user, raw_key = self.create_user_with_api_key("slugfilter")
+        self.create_short_url(owner=user, slug="wanted")
+        self.create_short_url(owner=user, slug="ignored")
+
+        response = self.get_api_links(api_key=raw_key, params={"slug": "wanted"})
+
+        self.assertEqual(response.status_code, 200)
+        results = response.json()["results"]
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["slug"], "wanted")
+
+    def test_links_listing_filters_by_public_mode(self):
+        user, raw_key = self.create_user_with_api_key("modefilter")
+        self.create_short_url(
+            owner=user,
+            slug="anonmode",
+            public_mode=ShortURL.PublicMode.ANONYMOUS,
+        )
+        self.create_short_url(
+            owner=user,
+            slug="namespacemode",
+            public_mode=ShortURL.PublicMode.NAMESPACE,
+        )
+
+        response = self.get_api_links(
+            api_key=raw_key,
+            params={"public_mode": ShortURL.PublicMode.NAMESPACE},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        results = response.json()["results"]
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["slug"], "namespacemode")
+        self.assertEqual(results[0]["public_path"], "/modefilter/namespacemode/")
+
+    def test_links_listing_hides_deleted_by_default(self):
+        user, raw_key = self.create_user_with_api_key("deleteddefault")
+        self.create_short_url(owner=user, slug="visible")
+        self.create_short_url(
+            owner=user,
+            slug="hidden",
+            deleted_at=timezone.now(),
+        )
+
+        response = self.get_api_links(api_key=raw_key)
+
+        self.assertEqual(response.status_code, 200)
+        slugs = {item["slug"] for item in response.json()["results"]}
+        self.assertEqual(slugs, {"visible"})
+
+    def test_links_listing_can_include_deleted(self):
+        user, raw_key = self.create_user_with_api_key("deletedincluded")
+        self.create_short_url(owner=user, slug="visible")
+        self.create_short_url(
+            owner=user,
+            slug="hidden",
+            deleted_at=timezone.now(),
+        )
+
+        response = self.get_api_links(
+            api_key=raw_key,
+            params={"include_deleted": "true"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        slugs = {item["slug"] for item in response.json()["results"]}
+        self.assertEqual(slugs, {"visible", "hidden"})
+
+    def test_links_listing_caps_limit_at_100(self):
+        user, raw_key = self.create_user_with_api_key("limitcap")
+        for index in range(105):
+            self.create_short_url(owner=user, slug=f"limit{index}")
+
+        response = self.get_api_links(api_key=raw_key, params={"limit": "250"})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["count"], 105)
+        self.assertEqual(payload["limit"], 100)
+        self.assertEqual(len(payload["results"]), 100)
+
+    def test_links_listing_offset_works(self):
+        user, raw_key = self.create_user_with_api_key("offsetuser")
+        self.create_short_url(owner=user, slug="first")
+        self.create_short_url(owner=user, slug="second")
+        self.create_short_url(owner=user, slug="third")
+
+        response = self.get_api_links(
+            api_key=raw_key,
+            params={"limit": "1", "offset": "1"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["count"], 3)
+        self.assertEqual(payload["offset"], 1)
+        self.assertEqual(payload["results"][0]["slug"], "second")
+
+    def test_links_listing_response_excludes_sensitive_owner_fields(self):
+        user, raw_key = self.create_user_with_api_key("sensitive")
+        self.create_short_url(
+            owner=user,
+            slug="safe",
+            password_hash=make_password("secret"),
+        )
+
+        response = self.get_api_links(api_key=raw_key)
+
+        self.assertEqual(response.status_code, 200)
+        item = response.json()["results"][0]
+        self.assertTrue(item["password_protected"])
+        self.assertNotIn("owner", item)
+        self.assertNotIn("api_key_hash", item)
+        self.assertNotIn("password_hash", item)
+
 
 class RateLimitTests(TestCase):
     def setUp(self):
@@ -862,6 +1043,12 @@ class RateLimitTests(TestCase):
             content_type="application/json",
             **headers,
         )
+
+    def get_api_links(self, api_key: str | None = None):
+        headers = {}
+        if api_key:
+            headers["HTTP_X_API_KEY"] = api_key
+        return self.client.get(reverse("api_links"), **headers)
 
     def post_create(self, **overrides):
         data = {
@@ -924,6 +1111,22 @@ class RateLimitTests(TestCase):
         self.assertEqual(first.status_code, 201)
         self.assertEqual(second.status_code, 429)
         self.assertEqual(ShortURL.objects.filter(owner=user).count(), 1)
+
+    @override_settings(URLBREVE_API_KEY_DAILY_LIMIT=1)
+    def test_api_key_links_listing_over_limit_returns_429(self):
+        user, raw_key = self.create_user_with_api_key("listlimited")
+        ShortURL.objects.create(
+            owner=user,
+            destination_url="https://example.com/one",
+            slug="listlimit",
+            public_mode=ShortURL.PublicMode.ANONYMOUS,
+        )
+
+        first = self.get_api_links(api_key=raw_key)
+        second = self.get_api_links(api_key=raw_key)
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 429)
 
     @override_settings(URLBREVE_AUTHENTICATED_DAILY_LIMIT=1)
     def test_authenticated_web_creation_over_limit_does_not_create_url(self):

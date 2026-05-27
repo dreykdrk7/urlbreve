@@ -9,6 +9,7 @@ urlpatterns = [
     path("", include("accounts.urls")),
     path("links/", include("links.urls")),
     path("api/shorten/", link_views.api_shorten, name="api_shorten"),
+    path("api/links/", link_views.api_links, name="api_links"),
     path("report/", link_views.abuse_report, name="abuse_report"),
     path("healthz/", link_views.healthz, name="healthz"),
     path("admin/", admin.site.urls),

@@ -17,6 +17,7 @@
 - `/a/<slug>/` - redirección pública anónima/global.
 - `/<namespace>/<slug>/` - redirección pública bajo namespace de usuario.
 - `/api/shorten/` - creación de URL corta por API JSON.
+- `/api/links/` - listado de URLs propias por API key.
 - `/report/` - formulario publico de reporte de abuso.
 - `/admin/` - administración de Django.
 - `/healthz/` - healthcheck básico.
@@ -25,7 +26,8 @@ En esta microfase están activos `/`, `/register/`, `/login/`, `/logout/`,
 `/dashboard/`, `/profile/`, `/profile/api-key/rotate/`,
 `/profile/api-key/revoke/`, `/links/new/`, `/links/<id>/`,
 `/links/<id>/edit/`, `/links/<id>/delete/`, `/a/<slug>/`,
-`/<namespace>/<slug>/`, `/api/shorten/`, `/report/`, `/healthz/` y `/admin/`.
+`/<namespace>/<slug>/`, `/api/shorten/`, `/api/links/`, `/report/`,
+`/healthz/` y `/admin/`.
 
 ## Modelo de privacidad
 
@@ -251,6 +253,43 @@ Respuesta exitosa `201`:
 La API no guarda IP, user-agent, referrer ni API keys en claro. Tampoco devuelve
 `api_key_hash`.
 
+`GET /api/links/` lista URLs propias del usuario resuelto desde `X-API-Key`.
+No hay modo anónimo para esta ruta. Si la clave falta o es inválida, devuelve
+`401` genérico.
+
+Scope:
+
+- solo `ShortURL.owner=user` asociado a la API key;
+- excluye URLs anónimas `owner=None`;
+- excluye URLs de otros usuarios;
+- excluye `deleted_at` por defecto.
+
+Query params:
+
+- `destination_url`: match exacto;
+- `slug`: match exacto;
+- `public_mode`: `anonymous` o `namespace`;
+- `include_deleted`: `false` por defecto;
+- `limit`: `50` por defecto, máximo `100`;
+- `offset`: `0` por defecto.
+
+Respuesta `200`:
+
+- `count`;
+- `limit`;
+- `offset`;
+- `results`, con campos públicos/operativos de cada URL propia.
+
+Cada item incluye `id`, `short_url`, `public_path`, `destination_url`, `title`,
+`slug`, `public_mode`, `expires_at`, `max_clicks`, `click_count`, `is_active`,
+`is_disabled`, `deleted_at`, `password_protected`, `created_at`, `updated_at` y
+`last_clicked_at`. No incluye `owner`, `api_key_hash` ni `password_hash`.
+
+El listado usa el mismo valor `URLBREVE_API_KEY_DAILY_LIMIT` con un bucket de
+cache propio para lecturas, de forma que una integración pueda comprobar si una
+URL destino ya existe antes de crear otra sin mezclar el contador con
+`POST /api/shorten/`.
+
 ## Registro y perfil
 
 El registro usa `django.contrib.auth` y un formulario propio sobre
@@ -307,6 +346,7 @@ La implementación actual usa Django cache con ventana diaria basada en
 - creación web: `request.user.id`;
 - creación anónima web: sesión Django;
 - API con `X-API-Key`: usuario resuelto desde la clave;
+- API listing con `X-API-Key`: usuario resuelto desde la clave;
 - API anónima: sesión Django;
 - reportes: sesión Django;
 - password gate: sesión Django + `ShortURL.id`.

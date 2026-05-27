@@ -96,10 +96,21 @@ def parse_non_negative_int(value, field_name: str) -> int:
     return parsed
 
 
+def parse_query_non_negative_int(request, field_name: str, default: int) -> int:
+    value = request.GET.get(field_name)
+    if value in (None, ""):
+        return default
+    return parse_non_negative_int(value, field_name)
+
+
 def clean_string(value) -> str:
     if value is None:
         return ""
     return str(value).strip()
+
+
+def parse_query_bool(value) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def serialize_short_url(short_url: ShortURL, request):
@@ -113,6 +124,32 @@ def serialize_short_url(short_url: ShortURL, request):
         "expires_at": short_url.expires_at.isoformat() if short_url.expires_at else None,
         "max_clicks": short_url.max_clicks,
         "password_protected": bool(short_url.password_hash),
+    }
+
+
+def serialize_short_url_listing_item(short_url: ShortURL, request):
+    return {
+        "id": short_url.pk,
+        "short_url": short_url.get_public_url(request),
+        "public_path": short_url.get_public_path(),
+        "destination_url": short_url.destination_url,
+        "title": short_url.title,
+        "slug": short_url.slug,
+        "public_mode": short_url.public_mode,
+        "expires_at": short_url.expires_at.isoformat() if short_url.expires_at else None,
+        "max_clicks": short_url.max_clicks,
+        "click_count": short_url.click_count,
+        "is_active": short_url.is_active,
+        "is_disabled": short_url.is_disabled,
+        "deleted_at": short_url.deleted_at.isoformat() if short_url.deleted_at else None,
+        "password_protected": bool(short_url.password_hash),
+        "created_at": short_url.created_at.isoformat(),
+        "updated_at": short_url.updated_at.isoformat(),
+        "last_clicked_at": (
+            short_url.last_clicked_at.isoformat()
+            if short_url.last_clicked_at
+            else None
+        ),
     }
 
 
@@ -220,6 +257,71 @@ def api_shorten(request):
         )
 
     return JsonResponse(serialize_short_url(short_url, request), status=201)
+
+
+@csrf_exempt
+def api_links(request):
+    if request.method != "GET":
+        response = json_error("Method not allowed.", status=405)
+        response["Allow"] = "GET"
+        return response
+
+    api_key = request.headers.get("X-API-Key", "").strip()
+    owner = get_user_for_api_key(api_key)
+    if owner is None:
+        return json_error("Invalid API key.", status=401)
+
+    limit_result = consume_user_daily_limit(
+        "api-key-list-links",
+        owner.pk,
+        settings.URLBREVE_API_KEY_DAILY_LIMIT,
+    )
+    if not limit_result.allowed:
+        return json_error("Rate limit exceeded.", status=429, limit=limit_result.limit)
+
+    try:
+        limit = parse_query_non_negative_int(request, "limit", 50)
+        offset = parse_query_non_negative_int(request, "offset", 0)
+    except ValueError as exc:
+        return json_error(str(exc), status=400)
+    limit = min(limit, 100)
+
+    public_mode = clean_string(request.GET.get("public_mode"))
+    if public_mode and public_mode not in ShortURL.PublicMode.values:
+        return json_error("public_mode must be anonymous or namespace.", status=400)
+
+    queryset = ShortURL.objects.select_related("owner__profile").filter(owner=owner)
+
+    if not parse_query_bool(request.GET.get("include_deleted")):
+        queryset = queryset.filter(deleted_at__isnull=True)
+
+    destination_url = clean_string(request.GET.get("destination_url"))
+    if destination_url:
+        queryset = queryset.filter(destination_url=destination_url)
+
+    slug = clean_string(request.GET.get("slug"))
+    if slug:
+        queryset = queryset.filter(slug=slug)
+
+    if public_mode:
+        queryset = queryset.filter(public_mode=public_mode)
+
+    queryset = queryset.order_by("pk")
+    count = queryset.count()
+    results = queryset[offset:offset + limit]
+
+    return JsonResponse(
+        {
+            "count": count,
+            "limit": limit,
+            "offset": offset,
+            "results": [
+                serialize_short_url_listing_item(short_url, request)
+                for short_url in results
+            ],
+        },
+        status=200,
+    )
 
 
 def unavailable(request):

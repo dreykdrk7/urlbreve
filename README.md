@@ -74,6 +74,7 @@ docker compose run --rm web python manage.py test
 - `/links/<id>/edit/` - edición de campos permitidos.
 - `/links/<id>/delete/` - ocultado mediante soft delete.
 - `/api/shorten/` - creación de URL corta mediante API JSON.
+- `/api/links/` - listado de URLs propias mediante API key.
 - `/report/` - formulario publico de reporte de abuso.
 - `/a/<slug>/` - redirección pública anónima/global.
 - `/<namespace>/<slug>/` - redirección pública bajo namespace.
@@ -189,6 +190,7 @@ Límites activos:
 - creación anónima por API, basada en sesión Django y desactivable por setting;
 - creación anónima web, basada en sesión Django;
 - creación por API key, limitada por usuario resuelto desde `X-API-Key`;
+- listado por API key, limitado por usuario resuelto desde `X-API-Key`;
 - creación web autenticada, limitada por `request.user.id`;
 - reportes de abuso, limitados por sesión;
 - honeypot silencioso en reportes de abuso;
@@ -217,6 +219,11 @@ La API key se gestiona desde `/profile/`. Solo se muestra en claro al generarla
 o rotarla; después se guarda únicamente `UserProfile.api_key_hash`. Revocarla
 borra ese hash.
 
+`GET /api/links/` permite listar URLs creadas por el usuario dueño de una
+`X-API-Key`. No permite acceso anónimo, no devuelve URLs `owner=None` y no
+devuelve URLs de otros usuarios. Es útil para integraciones que necesitan
+comprobar si una URL ya existe antes de crear otra.
+
 Ejemplo anónimo:
 
 ```bash
@@ -234,6 +241,13 @@ curl -X POST http://localhost:8000/api/shorten/ \
   -d '{"destination_url":"https://example.com","public_mode":"namespace"}'
 ```
 
+Ejemplo de listado para comprobar una URL destino:
+
+```bash
+curl "http://localhost:8000/api/links/?destination_url=https://example.com" \
+  -H "X-API-Key: ub_tu_clave"
+```
+
 Campos admitidos:
 
 - `destination_url`, requerido, solo `http://` o `https://`;
@@ -244,7 +258,21 @@ Campos admitidos:
 - `max_clicks`, opcional, `0` por defecto;
 - `password`, opcional.
 
-La API no guarda IPs, user-agent, referrer ni API keys en claro.
+Filtros admitidos en `GET /api/links/`:
+
+- `destination_url`, match exacto;
+- `slug`, match exacto;
+- `public_mode`, `anonymous` o `namespace`;
+- `include_deleted`, `false` por defecto;
+- `limit`, `50` por defecto y máximo `100`;
+- `offset`, `0` por defecto.
+
+El listado devuelve `count`, `limit`, `offset` y `results`. Cada resultado
+incluye ruta pública, destino, slug, modo, expiración, clicks agregados, estados
+operativos y si está protegido por contraseña.
+
+La API no guarda IPs, user-agent, referrer ni API keys en claro. Tampoco
+devuelve `api_key_hash`, hashes de contraseña ni datos de owner.
 
 ## Estado
 
@@ -261,6 +289,7 @@ Microfase actual:
 - redirecciones públicas con contador agregado diario;
 - enlaces protegidos con contraseña;
 - API mínima de creación con `X-API-Key`;
+- API autenticada de listado de URLs propias;
 - reporte de abuso sin datos personales del visitante;
 - honeypot anti-spam en reportes sin captcha externo;
 - moderacion basica con `is_disabled`;
