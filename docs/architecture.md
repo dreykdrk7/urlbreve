@@ -8,6 +8,10 @@
 - `/logout/` - logout mediante POST.
 - `/dashboard/` - panel privado mínimo.
 - `/profile/` - edición de perfil básico.
+- `/links/new/` - creación autenticada de URL corta.
+- `/links/<id>/` - detalle básico de URL propia.
+- `/links/<id>/edit/` - edición de campos permitidos.
+- `/links/<id>/delete/` - ocultado mediante soft delete.
 - `/a/<slug>/` - futuro enlace anónimo/global.
 - `/<namespace>/<slug>/` - futuro enlace público bajo namespace de usuario.
 - `/api/shorten/` - futuro endpoint API.
@@ -15,7 +19,8 @@
 - `/healthz/` - healthcheck básico.
 
 En esta microfase están activos `/`, `/register/`, `/login/`, `/logout/`,
-`/dashboard/`, `/profile/`, `/healthz/` y `/admin/`.
+`/dashboard/`, `/profile/`, `/links/new/`, `/links/<id>/`,
+`/links/<id>/edit/`, `/links/<id>/delete/`, `/healthz/` y `/admin/`.
 
 ## Modelo de privacidad
 
@@ -40,6 +45,64 @@ El namespace público vive en `UserProfile` y es único. Se puede editar, así q
 los enlaces namespaced se modelan por `owner + slug` y no duplican el namespace
 como texto en cada URL. Esto evita inconsistencias si el usuario cambia su
 namespace.
+
+## Gestión autenticada de URLs
+
+La gestión inicial de `ShortURL` vive en vistas Django protegidas por login. El
+dashboard muestra las URLs propias no eliminadas y su ruta pública conceptual,
+clicks, expiración, límite y estado.
+
+Campos editables al crear:
+
+- `destination_url`;
+- `slug`, opcional;
+- `title`;
+- `public_mode`;
+- `expires_days`;
+- `max_clicks`;
+- `password`.
+
+Si `slug` queda vacío, se genera un código aleatorio seguro de 8 caracteres y se
+comprueba que no colisione en el modo elegido. Si el usuario informa un slug, se
+valida con la regla ASCII conservadora y se comprueba colisión antes de guardar.
+
+Campos editables después de crear:
+
+- `destination_url`;
+- `title`;
+- `expires_at`;
+- `max_clicks`;
+- `is_active`;
+- `password`.
+
+Campos no editables después de crear:
+
+- `slug`;
+- `public_mode`;
+- `owner`.
+
+La contraseña queda guardada como hash en `password_hash`, pero el flujo público
+de acceso con contraseña todavía no está implementado.
+
+## Soft delete y disponibilidad
+
+La acción de ocultar una URL marca `deleted_at` y no borra físicamente la fila.
+Las URLs con `deleted_at` no aparecen en el dashboard/listado normal. Por ahora,
+los slugs de URLs ocultas siguen bloqueados por las constraints de unicidad para
+evitar reutilización accidental y preservar auditabilidad.
+
+`ShortURL` expone helpers de dominio:
+
+- `get_public_path()`;
+- `get_public_url(request=None)`;
+- `is_expired`;
+- `is_click_limit_reached`;
+- `is_available`;
+- `mark_deleted()`.
+
+`is_available` solo indica disponibilidad operativa para uso futuro en
+redirecciones: no eliminada, activa, no deshabilitada, no expirada y sin límite
+de clicks agotado. No se usa todavía para servir redirecciones públicas.
 
 ## Registro y perfil
 
@@ -82,7 +145,8 @@ Los namespaces públicos usan una variante en minúsculas de esa regla para evit
 ambigüedad visual en rutas públicas.
 
 Existe `links.validators.suggest_slug_variants()` como helper preparado para
-sugerir variantes cuando haya colisión. Todavía no consulta la base de datos.
+sugerir variantes cuando haya colisión. En la creación autenticada se usa para
+mostrar alternativas cuando un slug manual ya existe.
 
 ## API futura
 
@@ -110,7 +174,6 @@ tracking invasivo. Opciones a evaluar:
 ## Decisiones pendientes
 
 - flujo de creación anónima;
-- creación de URLs autenticadas desde dashboard;
 - redirecciones y comportamiento de enlaces expirados, desactivados o con
   contraseña;
 - formulario o proceso de reporte de abuso;

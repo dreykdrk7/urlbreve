@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}URL corta - urlbreve{% endblock %}
+
+{% block content %}
+  <section class="panel">
+    <h1>URL corta</h1>
+    <div class="profile-grid">
+      <div class="profile-item">
+        <p class="profile-label">Ruta publica</p>
+        <p class="profile-value">{{ short_url.get_public_path }}</p>
+      </div>
+      <div class="profile-item">
+        <p class="profile-label">Modo</p>
+        <p class="profile-value">{{ short_url.get_public_mode_display }}</p>
+      </div>
+      <div class="profile-item">
+        <p class="profile-label">Clicks</p>
+        <p class="profile-value">{{ short_url.click_count }}</p>
+      </div>
+      <div class="profile-item">
+        <p class="profile-label">Estado</p>
+        <p class="profile-value">{{ short_url.status_label }}</p>
+      </div>
+    </div>
+    <div class="profile-grid">
+      <div class="profile-item">
+        <p class="profile-label">Destino</p>
+        <p class="profile-value">{{ short_url.destination_url }}</p>
+      </div>
+      <div class="profile-item">
+        <p class="profile-label">Titulo</p>
+        <p class="profile-value">{{ short_url.title|default:"Sin titulo" }}</p>
+      </div>
+      <div class="profile-item">
+        <p class="profile-label">Expira</p>
+        <p class="profile-value">
+          {% if short_url.expires_at %}
+            {{ short_url.expires_at|date:"Y-m-d H:i" }}
+          {% else %}
+            Nunca
+          {% endif %}
+        </p>
+      </div>
+      <div class="profile-item">
+        <p class="profile-label">Limite</p>
+        <p class="profile-value">
+          {% if short_url.max_clicks %}{{ short_url.max_clicks }}{% else %}Ilimitado{% endif %}
+        </p>
+      </div>
+    </div>
+    <div class="actions">
+      <a class="button" href="{% url 'links:edit' short_url.pk %}">Editar</a>
+      <a class="button secondary" href="{% url 'accounts:dashboard' %}">Dashboard</a>
+      <a class="button warning" href="{% url 'links:delete' short_url.pk %}">Ocultar</a>
+    </div>
+  </section>
+{% endblock %}

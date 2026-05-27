@@ -25,8 +25,8 @@
         <p class="profile-value">{{ short_url_count }}</p>
       </div>
     </div>
-    <p class="lead">La creacion de URLs llegara en la siguiente fase.</p>
     <div class="actions">
+      <a class="button" href="{% url 'links:create' %}">Crear URL</a>
       <a class="button" href="{% url 'accounts:profile_edit' %}">Editar perfil</a>
       <form class="logout-form" method="post" action="{% url 'accounts:logout' %}">
         {% csrf_token %}
@@ -34,4 +34,54 @@
       </form>
     </div>
   </section>
+
+  {% if short_urls %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>URL corta</th>
+            <th>Destino</th>
+            <th>Clicks</th>
+            <th>Expira</th>
+            <th>Limite</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for short_url in short_urls %}
+            <tr>
+              <td class="url-cell">{{ short_url.get_public_path }}</td>
+              <td class="url-cell">{{ short_url.destination_url }}</td>
+              <td>{{ short_url.click_count }}</td>
+              <td>
+                {% if short_url.expires_at %}
+                  {{ short_url.expires_at|date:"Y-m-d H:i" }}
+                {% else %}
+                  Nunca
+                {% endif %}
+              </td>
+              <td>
+                {% if short_url.max_clicks %}
+                  {{ short_url.max_clicks }}
+                {% else %}
+                  Ilimitado
+                {% endif %}
+              </td>
+              <td>{{ short_url.status_label }}</td>
+              <td>
+                <div class="inline-actions">
+                  <a href="{% url 'links:detail' short_url.pk %}">Ver</a>
+                  <a href="{% url 'links:edit' short_url.pk %}">Editar</a>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state">Todavia no hay URLs creadas.</div>
+  {% endif %}
 {% endblock %}

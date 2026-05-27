@@ -9,8 +9,11 @@ RESERVED_SLUGS = {
     "api",
     "dashboard",
     "healthz",
+    "links",
     "login",
     "logout",
+    "profile",
+    "register",
     "signup",
 }
 

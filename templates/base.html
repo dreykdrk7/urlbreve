@@ -146,7 +146,11 @@
 
     input[type="text"],
     input[type="email"],
-    input[type="password"] {
+    input[type="password"],
+    input[type="url"],
+    input[type="number"],
+    input[type="datetime-local"],
+    select {
       width: 100%;
       min-height: 44px;
       padding: 10px 12px;
@@ -161,6 +165,11 @@
       width: 18px;
       height: 18px;
       accent-color: var(--accent);
+    }
+
+    .help-text {
+      color: var(--muted);
+      font-size: 0.95rem;
     }
 
     .checkbox-field {
@@ -197,6 +206,67 @@
       margin: 4px 0 0;
       font-weight: 700;
       overflow-wrap: anywhere;
+    }
+
+    .table-wrap {
+      width: 100%;
+      margin-top: 28px;
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #ffffff;
+      font-size: 0.95rem;
+    }
+
+    th,
+    td {
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      white-space: nowrap;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 650;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .url-cell {
+      max-width: 260px;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
+    .inline-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .inline-actions a {
+      color: var(--accent);
+      font-weight: 650;
+      text-decoration: none;
+    }
+
+    .empty-state {
+      margin-top: 24px;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+      color: var(--muted);
     }
 
     .actions {

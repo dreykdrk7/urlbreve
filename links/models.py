@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.urls import reverse
+from django.utils import timezone
 
 from .validators import validate_http_https_url, validate_safe_slug
 
@@ -67,6 +69,57 @@ class ShortURL(models.Model):
         super().clean()
         if self.public_mode == self.PublicMode.NAMESPACE and self.owner_id is None:
             raise ValidationError({"owner": "Namespaced links require an owner."})
+
+    def get_public_path(self) -> str:
+        if self.public_mode == self.PublicMode.NAMESPACE and self.owner_id:
+            namespace = self.owner.profile.public_namespace
+            return f"/{namespace}/{self.slug}/"
+        return f"/a/{self.slug}/"
+
+    def get_public_url(self, request=None) -> str:
+        path = self.get_public_path()
+        if request is None:
+            return path
+        return request.build_absolute_uri(path)
+
+    @property
+    def is_expired(self) -> bool:
+        return bool(self.expires_at and self.expires_at <= timezone.now())
+
+    @property
+    def is_click_limit_reached(self) -> bool:
+        return bool(self.max_clicks and self.click_count >= self.max_clicks)
+
+    @property
+    def is_available(self) -> bool:
+        return (
+            self.deleted_at is None
+            and self.is_active
+            and not self.is_disabled
+            and not self.is_expired
+            and not self.is_click_limit_reached
+        )
+
+    @property
+    def status_label(self) -> str:
+        if self.deleted_at:
+            return "eliminada"
+        if self.is_disabled:
+            return "desactivada"
+        if not self.is_active:
+            return "inactiva"
+        if self.is_expired:
+            return "expirada"
+        if self.is_click_limit_reached:
+            return "agotada"
+        return "activa"
+
+    def mark_deleted(self) -> None:
+        self.deleted_at = timezone.now()
+        self.save(update_fields=["deleted_at", "updated_at"])
+
+    def get_absolute_url(self):
+        return reverse("links:detail", kwargs={"pk": self.pk})
 
     def __str__(self) -> str:
         return f"{self.public_mode}:{self.slug}"

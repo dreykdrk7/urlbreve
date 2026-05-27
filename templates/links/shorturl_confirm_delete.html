@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Ocultar URL - urlbreve{% endblock %}
+
+{% block content %}
+  <section class="panel">
+    <h1>Ocultar URL</h1>
+    <p class="lead">{{ short_url.get_public_path }}</p>
+    <form class="form" method="post">
+      {% csrf_token %}
+      <div class="actions">
+        <button class="button warning" type="submit">Ocultar</button>
+        <a class="button secondary" href="{% url 'links:detail' short_url.pk %}">Cancelar</a>
+      </div>
+    </form>
+  </section>
+{% endblock %}

@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}
+  {% if mode == "edit" %}Editar URL{% else %}Crear URL{% endif %} - urlbreve
+{% endblock %}
+
+{% block content %}
+  <section class="panel">
+    <h1>{% if mode == "edit" %}Editar URL{% else %}Crear URL{% endif %}</h1>
+    {% if short_url %}
+      <p class="lead">{{ short_url.get_public_path }}</p>
+    {% endif %}
+    <form class="form" method="post">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="form-errors">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      <div class="field">
+        {{ form.destination_url.label_tag }}
+        {{ form.destination_url }}
+        {% for error in form.destination_url.errors %}
+          <div class="field-error">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      {% if form.slug %}
+        <div class="field">
+          {{ form.slug.label_tag }}
+          {{ form.slug }}
+          <div class="help-text">Dejalo vacio para generar un slug aleatorio.</div>
+          {% for error in form.slug.errors %}
+            <div class="field-error">{{ error }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="field">
+        {{ form.title.label_tag }}
+        {{ form.title }}
+        {% for error in form.title.errors %}
+          <div class="field-error">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      {% if form.public_mode %}
+        <div class="field">
+          {{ form.public_mode.label_tag }}
+          {{ form.public_mode }}
+          {% for error in form.public_mode.errors %}
+            <div class="field-error">{{ error }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% if form.expires_days %}
+        <div class="field">
+          {{ form.expires_days.label_tag }}
+          {{ form.expires_days }}
+          <div class="help-text">0 significa que no expira.</div>
+          {% for error in form.expires_days.errors %}
+            <div class="field-error">{{ error }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% if form.expires_at %}
+        <div class="field">
+          {{ form.expires_at.label_tag }}
+          {{ form.expires_at }}
+          {% for error in form.expires_at.errors %}
+            <div class="field-error">{{ error }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="field">
+        {{ form.max_clicks.label_tag }}
+        {{ form.max_clicks }}
+        <div class="help-text">0 significa ilimitado.</div>
+        {% for error in form.max_clicks.errors %}
+          <div class="field-error">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      {% if form.is_active %}
+        <div class="checkbox-field">
+          {{ form.is_active }}
+          {{ form.is_active.label_tag }}
+        </div>
+        {% for error in form.is_active.errors %}
+          <div class="field-error">{{ error }}</div>
+        {% endfor %}
+      {% endif %}
+
+      <div class="field">
+        {{ form.password.label_tag }}
+        {{ form.password }}
+        {% for error in form.password.errors %}
+          <div class="field-error">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      {% if form.clear_password %}
+        <div class="checkbox-field">
+          {{ form.clear_password }}
+          {{ form.clear_password.label_tag }}
+        </div>
+        {% for error in form.clear_password.errors %}
+          <div class="field-error">{{ error }}</div>
+        {% endfor %}
+      {% endif %}
+
+      <div class="actions">
+        <button class="button" type="submit">Guardar</button>
+        <a class="button secondary" href="{% url 'accounts:dashboard' %}">Volver</a>
+      </div>
+    </form>
+  </section>
+{% endblock %}

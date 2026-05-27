@@ -28,12 +28,18 @@ def register(request):
 @login_required
 def dashboard(request):
     profile = ensure_user_profile(request.user)
+    short_urls = (
+        request.user.short_urls.filter(deleted_at__isnull=True)
+        .select_related("owner__profile")
+        .order_by("-created_at")
+    )
     return render(
         request,
         "accounts/dashboard.html",
         {
             "profile": profile,
-            "short_url_count": request.user.short_urls.count(),
+            "short_url_count": short_urls.count(),
+            "short_urls": short_urls,
         },
     )
 
