@@ -96,6 +96,7 @@ class ShortURL(models.Model):
             self.deleted_at is None
             and self.is_active
             and not self.is_disabled
+            and not self.password_hash
             and not self.is_expired
             and not self.is_click_limit_reached
         )
@@ -112,6 +113,8 @@ class ShortURL(models.Model):
             return "expirada"
         if self.is_click_limit_reached:
             return "agotada"
+        if self.password_hash:
+            return "protegida"
         return "activa"
 
     def mark_deleted(self) -> None:

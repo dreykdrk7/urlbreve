@@ -1,8 +1,12 @@
-from django.db.models import Q
+from django.db import transaction
+from django.db.models import F, Q
+from django.utils import timezone
 import secrets
 import string
 
-from .models import ShortURL
+from accounts.models import UserProfile
+
+from .models import ShortURL, ShortURLDailyStats
 from .validators import RESERVED_SLUGS, validate_safe_slug
 
 
@@ -30,3 +34,76 @@ def generate_random_slug(public_mode: str, owner=None, length: int = 8) -> str:
         validate_safe_slug(slug)
         if slug_is_available(slug, public_mode, owner=owner):
             return slug
+
+
+def resolve_anonymous_short_url(slug: str, for_update: bool = False) -> ShortURL | None:
+    queryset = ShortURL.objects.filter(
+        public_mode=ShortURL.PublicMode.ANONYMOUS,
+        slug=slug,
+    )
+    if for_update:
+        queryset = queryset.select_for_update()
+    else:
+        queryset = queryset.select_related("owner__profile")
+    return queryset.first()
+
+
+def resolve_namespaced_short_url(
+    namespace: str,
+    slug: str,
+    for_update: bool = False,
+) -> ShortURL | None:
+    profile = UserProfile.objects.select_related("user").filter(
+        public_namespace=namespace,
+    ).first()
+    if profile is None:
+        return None
+
+    queryset = ShortURL.objects.filter(
+        public_mode=ShortURL.PublicMode.NAMESPACE,
+        owner=profile.user,
+        slug=slug,
+    )
+    if for_update:
+        queryset = queryset.select_for_update()
+    else:
+        queryset = queryset.select_related("owner__profile")
+    return queryset.first()
+
+
+def record_click(short_url: ShortURL) -> None:
+    now = timezone.now()
+    today = timezone.localdate(now)
+
+    short_url.click_count = F("click_count") + 1
+    short_url.last_clicked_at = now
+    short_url.save(update_fields=["click_count", "last_clicked_at", "updated_at"])
+
+    stats, _ = ShortURLDailyStats.objects.get_or_create(
+        short_url=short_url,
+        date=today,
+        defaults={"clicks": 0},
+    )
+    stats.clicks = F("clicks") + 1
+    stats.save(update_fields=["clicks"])
+
+
+def visit_short_url(short_url: ShortURL | None) -> str | None:
+    if short_url is None or not short_url.is_available:
+        return None
+
+    destination_url = short_url.destination_url
+    record_click(short_url)
+    return destination_url
+
+
+def visit_anonymous_short_url(slug: str) -> str | None:
+    with transaction.atomic():
+        short_url = resolve_anonymous_short_url(slug, for_update=True)
+        return visit_short_url(short_url)
+
+
+def visit_namespaced_short_url(namespace: str, slug: str) -> str | None:
+    with transaction.atomic():
+        short_url = resolve_namespaced_short_url(namespace, slug, for_update=True)
+        return visit_short_url(short_url)

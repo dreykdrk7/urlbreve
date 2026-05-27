@@ -3,10 +3,12 @@ from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
+from datetime import timedelta
 
 from accounts.models import UserProfile
 
-from .models import ShortURL
+from .models import ShortURL, ShortURLDailyStats
 from .validators import suggest_slug_variants, validate_http_https_url, validate_safe_slug
 
 
@@ -225,3 +227,161 @@ class ShortURLManagementTests(TestCase):
         self.assertIsNotNone(short_url.deleted_at)
         dashboard = self.client.get(reverse("accounts:dashboard"))
         self.assertNotContains(dashboard, "/a/hide-me/")
+
+
+class PublicRedirectTests(TestCase):
+    def create_user(self, username: str):
+        user = User.objects.create_user(username=username, password="StrongPass123")
+        UserProfile.objects.create(user=user, public_namespace=username)
+        return user
+
+    def create_short_url(self, **overrides):
+        user = overrides.pop("owner", None) or self.create_user("owner")
+        data = {
+            "owner": user,
+            "destination_url": "https://example.com/destination",
+            "slug": "go1",
+            "public_mode": ShortURL.PublicMode.ANONYMOUS,
+        }
+        data.update(overrides)
+        return ShortURL.objects.create(**data)
+
+    def assert_unavailable(self, response):
+        self.assertEqual(response.status_code, 404)
+        self.assertContains(response, "Este enlace ya no esta disponible", status_code=404)
+        self.assertNotContains(response, "expir", status_code=404)
+        self.assertNotContains(response, "desactiv", status_code=404)
+        self.assertNotContains(response, "agot", status_code=404)
+
+    def test_available_anonymous_redirects(self):
+        self.create_short_url(slug="anon", destination_url="https://example.com/anon")
+
+        response = self.client.get("/a/anon/")
+
+        self.assertRedirects(
+            response,
+            "https://example.com/anon",
+            fetch_redirect_response=False,
+        )
+
+    def test_available_namespace_redirects(self):
+        user = self.create_user("alice")
+        self.create_short_url(
+            owner=user,
+            slug="docs",
+            public_mode=ShortURL.PublicMode.NAMESPACE,
+            destination_url="https://example.com/docs",
+        )
+
+        response = self.client.get("/alice/docs/")
+
+        self.assertRedirects(
+            response,
+            "https://example.com/docs",
+            fetch_redirect_response=False,
+        )
+
+    def test_redirect_increments_click_count_stats_and_last_clicked_at(self):
+        short_url = self.create_short_url(slug="count")
+
+        response = self.client.get("/a/count/")
+
+        self.assertEqual(response.status_code, 302)
+        short_url.refresh_from_db()
+        self.assertEqual(short_url.click_count, 1)
+        self.assertIsNotNone(short_url.last_clicked_at)
+        stats = ShortURLDailyStats.objects.get(
+            short_url=short_url,
+            date=timezone.localdate(),
+        )
+        self.assertEqual(stats.clicks, 1)
+
+    def test_missing_link_shows_generic_unavailable(self):
+        response = self.client.get("/a/missing/")
+
+        self.assert_unavailable(response)
+
+    def test_expired_link_does_not_redirect(self):
+        short_url = self.create_short_url(
+            slug="expired",
+            expires_at=timezone.now() - timedelta(days=1),
+        )
+
+        response = self.client.get("/a/expired/")
+
+        self.assert_unavailable(response)
+        short_url.refresh_from_db()
+        self.assertEqual(short_url.click_count, 0)
+
+    def test_inactive_link_does_not_redirect(self):
+        self.create_short_url(slug="inactive", is_active=False)
+
+        response = self.client.get("/a/inactive/")
+
+        self.assert_unavailable(response)
+
+    def test_disabled_link_does_not_redirect(self):
+        self.create_short_url(slug="disabled", is_disabled=True)
+
+        response = self.client.get("/a/disabled/")
+
+        self.assert_unavailable(response)
+
+    def test_soft_deleted_link_does_not_redirect(self):
+        self.create_short_url(slug="deleted", deleted_at=timezone.now())
+
+        response = self.client.get("/a/deleted/")
+
+        self.assert_unavailable(response)
+
+    def test_password_protected_link_does_not_redirect_until_gate_exists(self):
+        self.create_short_url(slug="protected", password_hash="fake-hash")
+
+        response = self.client.get("/a/protected/")
+
+        self.assert_unavailable(response)
+
+    def test_max_clicks_one_allows_first_access_and_blocks_second(self):
+        short_url = self.create_short_url(slug="once", max_clicks=1)
+
+        first_response = self.client.get("/a/once/")
+        second_response = self.client.get("/a/once/")
+
+        self.assertEqual(first_response.status_code, 302)
+        self.assert_unavailable(second_response)
+        short_url.refresh_from_db()
+        self.assertEqual(short_url.click_count, 1)
+
+    def test_missing_namespace_does_not_break(self):
+        response = self.client.get("/missing-space/anything/")
+
+        self.assert_unavailable(response)
+
+    def test_identical_anonymous_and_namespace_slug_resolve_by_route(self):
+        owner = self.create_user("shared")
+        self.create_short_url(
+            owner=owner,
+            slug="same",
+            public_mode=ShortURL.PublicMode.ANONYMOUS,
+            destination_url="https://example.com/anonymous",
+        )
+        self.create_short_url(
+            owner=owner,
+            slug="same",
+            public_mode=ShortURL.PublicMode.NAMESPACE,
+            destination_url="https://example.com/namespaced",
+        )
+
+        anonymous_response = self.client.get("/a/same/")
+        namespace_response = self.client.get("/shared/same/")
+
+        self.assertRedirects(
+            anonymous_response,
+            "https://example.com/anonymous",
+            fetch_redirect_response=False,
+        )
+        self.assertRedirects(
+            namespace_response,
+            "https://example.com/namespaced",
+            fetch_redirect_response=False,
+        )

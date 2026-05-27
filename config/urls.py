@@ -10,4 +10,10 @@ urlpatterns = [
     path("links/", include("links.urls")),
     path("healthz/", link_views.healthz, name="healthz"),
     path("admin/", admin.site.urls),
+    path("a/<slug:slug>/", link_views.public_anonymous_redirect, name="anonymous_redirect"),
+    path(
+        "<str:namespace>/<slug:slug>/",
+        link_views.public_namespaced_redirect,
+        name="namespaced_redirect",
+    ),
 ]

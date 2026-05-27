@@ -12,25 +12,26 @@
 - `/links/<id>/` - detalle básico de URL propia.
 - `/links/<id>/edit/` - edición de campos permitidos.
 - `/links/<id>/delete/` - ocultado mediante soft delete.
-- `/a/<slug>/` - futuro enlace anónimo/global.
-- `/<namespace>/<slug>/` - futuro enlace público bajo namespace de usuario.
+- `/a/<slug>/` - redirección pública anónima/global.
+- `/<namespace>/<slug>/` - redirección pública bajo namespace de usuario.
 - `/api/shorten/` - futuro endpoint API.
 - `/admin/` - administración de Django.
 - `/healthz/` - healthcheck básico.
 
 En esta microfase están activos `/`, `/register/`, `/login/`, `/logout/`,
 `/dashboard/`, `/profile/`, `/links/new/`, `/links/<id>/`,
-`/links/<id>/edit/`, `/links/<id>/delete/`, `/healthz/` y `/admin/`.
+`/links/<id>/edit/`, `/links/<id>/delete/`, `/a/<slug>/`,
+`/<namespace>/<slug>/`, `/healthz/` y `/admin/`.
 
 ## Modelo de privacidad
 
-urlbreve no debe guardar IPs, user-agent, geolocalización ni identificadores de
-tracking. Las estadísticas se diseñan como contadores agregados, por ejemplo
-clics diarios por enlace mediante `ShortURLDailyStats`.
+urlbreve no debe guardar IPs, user-agent, referrer, geolocalización ni
+identificadores de tracking. Las estadísticas se diseñan como contadores
+agregados, por ejemplo clics diarios por enlace mediante `ShortURLDailyStats`.
 
-Las futuras redirecciones deberán evitar logs de aplicación con datos de
-visitantes. En producción también habrá que revisar configuración de reverse
-proxy y logs web para alinear la infraestructura con esta política.
+Las redirecciones públicas no persisten datos del visitante. En producción
+también habrá que revisar configuración de reverse proxy y logs web para
+alinear la infraestructura con esta política.
 
 ## Modos de URL
 
@@ -82,7 +83,8 @@ Campos no editables después de crear:
 - `owner`.
 
 La contraseña queda guardada como hash en `password_hash`, pero el flujo público
-de acceso con contraseña todavía no está implementado.
+de acceso con contraseña todavía no está implementado. Hasta que exista ese
+flujo, un enlace con `password_hash` no se redirige públicamente.
 
 ## Soft delete y disponibilidad
 
@@ -100,9 +102,34 @@ evitar reutilización accidental y preservar auditabilidad.
 - `is_available`;
 - `mark_deleted()`.
 
-`is_available` solo indica disponibilidad operativa para uso futuro en
-redirecciones: no eliminada, activa, no deshabilitada, no expirada y sin límite
-de clicks agotado. No se usa todavía para servir redirecciones públicas.
+`is_available` indica disponibilidad operativa para redirecciones: no eliminada,
+activa, no deshabilitada, sin contraseña pendiente de flujo, no expirada y sin
+límite de clicks agotado.
+
+## Redirecciones públicas y estadísticas
+
+Las rutas públicas activas son:
+
+- `/a/<slug>/`, que busca `ShortURL.public_mode=anonymous`;
+- `/<namespace>/<slug>/`, que resuelve `UserProfile.public_namespace` y luego
+  busca `ShortURL.public_mode=namespace` para ese owner.
+
+Antes de redirigir, la vista entra en una transacción y bloquea la fila de
+`ShortURL` con `select_for_update`. Esto evita una carrera evidente con
+`max_clicks=1`: el primer acceso incrementa el contador y el segundo ya ve el
+límite agotado.
+
+Si el enlace no existe o no está disponible, se devuelve una página genérica
+`links/unavailable.html` con status `404`. La respuesta no indica si el enlace
+existió, expiró, fue deshabilitado, fue ocultado o agotó usos.
+
+Si el enlace está disponible, se registra únicamente:
+
+- incremento de `ShortURL.click_count`;
+- actualización de `ShortURL.last_clicked_at`;
+- incremento de `ShortURLDailyStats.clicks` para la fecha local actual.
+
+No se guardan IPs, user-agent ni referrer en el modelo de estadísticas.
 
 ## Registro y perfil
 
@@ -174,8 +201,7 @@ tracking invasivo. Opciones a evaluar:
 ## Decisiones pendientes
 
 - flujo de creación anónima;
-- redirecciones y comportamiento de enlaces expirados, desactivados o con
-  contraseña;
+- flujo público para enlaces con contraseña;
 - formulario o proceso de reporte de abuso;
 - política exacta de logs en reverse proxy;
 - borrado lógico frente a reutilización futura de slugs;

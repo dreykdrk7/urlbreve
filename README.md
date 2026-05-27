@@ -71,6 +71,8 @@ docker compose run --rm web python manage.py test
 - `/links/<id>/` - detalle básico de una URL propia.
 - `/links/<id>/edit/` - edición de campos permitidos.
 - `/links/<id>/delete/` - ocultado mediante soft delete.
+- `/a/<slug>/` - redirección pública anónima/global.
+- `/<namespace>/<slug>/` - redirección pública bajo namespace.
 - `/healthz/` - healthcheck.
 - `/admin/` - administración Django.
 
@@ -108,6 +110,32 @@ Reglas de colisión:
   `/<namespace>/<slug>/`;
 - si un slug manual colisiona, se devuelve un error con sugerencias.
 
+## Redirecciones públicas
+
+Las rutas públicas activas son `/a/<slug>/` para enlaces anónimos/globales y
+`/<namespace>/<slug>/` para enlaces namespaced. Antes de redirigir se comprueba
+que el enlace:
+
+- no esté ocultado con `deleted_at`;
+- esté activo;
+- no esté deshabilitado por moderación;
+- no esté expirado;
+- no haya agotado `max_clicks`;
+- no tenga contraseña pendiente de flujo público.
+
+Si el enlace no existe o no está disponible, se devuelve una página genérica con
+status `404`. La página no revela si el enlace existió, expiró, fue desactivado
+o agotó usos.
+
+Cuando el enlace está disponible, urlbreve redirige a `destination_url` y solo
+actualiza contadores agregados:
+
+- `ShortURL.click_count`;
+- `ShortURL.last_clicked_at`;
+- `ShortURLDailyStats.clicks` para la fecha actual.
+
+No se guardan IPs, user-agent, referrer ni datos de tracking del visitante.
+
 ## Estado
 
 Microfase actual:
@@ -119,8 +147,9 @@ Microfase actual:
 - dashboard privado mínimo;
 - edición de namespace público y preferencia de modo;
 - creación, listado, detalle, edición limitada y soft delete de URLs propias;
+- redirecciones públicas con contador agregado diario;
 - página inicial y endpoint `/healthz/`;
 - documentación y licencia AGPLv3.
 
-No están implementadas todavía las redirecciones públicas, la API pública ni el
-rate limiting.
+No están implementadas todavía la API pública, el flujo de contraseña, reporte
+de abuso ni el rate limiting.

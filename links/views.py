@@ -6,6 +6,7 @@ from django.shortcuts import render
 
 from .forms import ShortURLCreateForm, ShortURLEditForm
 from .models import ShortURL
+from .services import visit_anonymous_short_url, visit_namespaced_short_url
 
 
 def home(request):
@@ -14,6 +15,24 @@ def home(request):
 
 def healthz(request):
     return JsonResponse({"status": "ok"})
+
+
+def unavailable(request):
+    return render(request, "links/unavailable.html", status=404)
+
+
+def public_anonymous_redirect(request, slug: str):
+    destination_url = visit_anonymous_short_url(slug)
+    if destination_url is None:
+        return unavailable(request)
+    return redirect(destination_url)
+
+
+def public_namespaced_redirect(request, namespace: str, slug: str):
+    destination_url = visit_namespaced_short_url(namespace, slug)
+    if destination_url is None:
+        return unavailable(request)
+    return redirect(destination_url)
 
 
 def get_owned_short_url(user, pk: int) -> ShortURL:
