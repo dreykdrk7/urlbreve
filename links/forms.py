@@ -5,7 +5,7 @@ from datetime import timedelta
 
 from accounts.services import ensure_user_profile
 
-from .models import ShortURL
+from .models import AbuseReport, ShortURL
 from .services import generate_random_slug, slug_is_available
 from .validators import suggest_slug_variants
 
@@ -159,4 +159,23 @@ class PasswordGateForm(forms.Form):
         label="Contrasena",
         strip=False,
         widget=forms.PasswordInput(render_value=False),
+    )
+
+
+class AbuseReportForm(forms.Form):
+    reported_path = forms.CharField(
+        label="Ruta reportada",
+        max_length=512,
+        help_text="Ejemplo: /a/demo/ o /namespace/demo/",
+    )
+    reason = forms.ChoiceField(
+        label="Motivo",
+        choices=AbuseReport.Reason.choices,
+    )
+    details = forms.CharField(
+        label="Detalles",
+        max_length=1000,
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 5}),
+        help_text="Opcional. No incluyas datos personales.",
     )

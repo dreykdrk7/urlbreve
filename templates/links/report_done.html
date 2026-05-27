@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Reporte recibido - urlbreve{% endblock %}
+
+{% block content %}
+  <section class="panel">
+    <h1>Reporte recibido</h1>
+    <p class="lead">
+      Gracias. El aviso queda pendiente de revision por administracion sin
+      guardar datos personales del visitante.
+    </p>
+    <div class="actions">
+      <a class="button secondary" href="{% url 'home' %}">Volver al inicio</a>
+    </div>
+  </section>
+{% endblock %}

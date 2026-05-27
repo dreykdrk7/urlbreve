@@ -3,6 +3,7 @@ from django.contrib.auth.hashers import check_password
 from django.db import transaction
 from django.db.models import F, Q
 from django.utils import timezone
+from urllib.parse import urlsplit
 import secrets
 import string
 
@@ -47,6 +48,32 @@ def generate_random_slug(public_mode: str, owner=None, length: int = 8) -> str:
         validate_safe_slug(slug)
         if slug_is_available(slug, public_mode, owner=owner):
             return slug
+
+
+def normalize_reported_path(value: str) -> str:
+    path = str(value or "").strip()
+    if not path:
+        return ""
+
+    parsed = urlsplit(path)
+    path = parsed.path or path
+    if not path.startswith("/"):
+        path = f"/{path}"
+    return path[:512]
+
+
+def resolve_reported_path(value: str) -> tuple[str, ShortURL | None]:
+    path = normalize_reported_path(value)
+    parts = [part for part in path.strip("/").split("/") if part]
+
+    if len(parts) != 2:
+        return path, None
+
+    namespace_or_a, slug = parts
+    if namespace_or_a == "a":
+        return path, resolve_anonymous_short_url(slug)
+
+    return path, resolve_namespaced_short_url(namespace_or_a, slug)
 
 
 def resolve_anonymous_short_url(slug: str, for_update: bool = False) -> ShortURL | None:

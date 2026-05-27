@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Reportar enlace - urlbreve{% endblock %}
+
+{% block content %}
+  <section class="panel">
+    <h1>Reportar enlace</h1>
+    <p class="lead">
+      Puedes avisar de una URL sospechosa sin identificarte. No guardamos IP,
+      user-agent, referrer ni email en los reportes.
+    </p>
+    <form class="form" method="post">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="form-errors">{{ form.non_field_errors }}</div>
+      {% endif %}
+      <div class="field">
+        {{ form.reported_path.label_tag }}
+        {{ form.reported_path }}
+        {% if form.reported_path.help_text %}
+          <div class="help-text">{{ form.reported_path.help_text }}</div>
+        {% endif %}
+        {% for error in form.reported_path.errors %}
+          <div class="field-error">{{ error }}</div>
+        {% endfor %}
+      </div>
+      <div class="field">
+        {{ form.reason.label_tag }}
+        {{ form.reason }}
+        {% for error in form.reason.errors %}
+          <div class="field-error">{{ error }}</div>
+        {% endfor %}
+      </div>
+      <div class="field">
+        {{ form.details.label_tag }}
+        {{ form.details }}
+        {% if form.details.help_text %}
+          <div class="help-text">{{ form.details.help_text }}</div>
+        {% endif %}
+        {% for error in form.details.errors %}
+          <div class="field-error">{{ error }}</div>
+        {% endfor %}
+      </div>
+      <div class="actions">
+        <button class="button" type="submit">Enviar reporte</button>
+        <a class="button secondary" href="{% url 'home' %}">Cancelar</a>
+      </div>
+    </form>
+  </section>
+{% endblock %}

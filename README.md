@@ -74,6 +74,7 @@ docker compose run --rm web python manage.py test
 - `/links/<id>/edit/` - edición de campos permitidos.
 - `/links/<id>/delete/` - ocultado mediante soft delete.
 - `/api/shorten/` - creación de URL corta mediante API JSON.
+- `/report/` - formulario publico de reporte de abuso.
 - `/a/<slug>/` - redirección pública anónima/global.
 - `/<namespace>/<slug>/` - redirección pública bajo namespace.
 - `/healthz/` - healthcheck.
@@ -143,6 +144,22 @@ contadores agregados:
 No se guardan IPs, user-agent, referrer ni datos de tracking del visitante.
 El password gate tampoco guarda datos del visitante ni registra intentos.
 
+## Reporte de abuso y moderacion
+
+`/report/` permite que cualquier visitante reporte una ruta sospechosa. El
+formulario acepta una ruta como `/a/demo/` o `/namespace/demo/`, un motivo y
+detalles opcionales limitados. Si la ruta corresponde a una URL conocida, el
+reporte queda asociado internamente a esa `ShortURL`; si no se puede resolver,
+se guarda igualmente con `short_url=None` para revision manual.
+
+Los reportes no guardan IP, user-agent, referrer ni email. Tampoco se usa captcha
+externo en esta fase.
+
+En el admin de Django se puede filtrar y revisar `AbuseReport`. Los enlaces
+tienen acciones de moderacion para marcar `is_disabled=True` o volver a
+habilitarlos. Un enlace deshabilitado queda bloqueado por las mismas reglas de
+disponibilidad de las redirecciones publicas.
+
 ## API
 
 `POST /api/shorten/` acepta JSON y responde JSON. Sin `X-API-Key`, crea una URL
@@ -198,8 +215,10 @@ Microfase actual:
 - redirecciones públicas con contador agregado diario;
 - enlaces protegidos con contraseña;
 - API mínima de creación con `X-API-Key`;
+- reporte de abuso sin datos personales del visitante;
+- moderacion basica con `is_disabled`;
 - página inicial y endpoint `/healthz/`;
 - documentación y licencia AGPLv3.
 
-No están implementados todavía reporte de abuso, rate limiting ni revisión fina
-de logs del VPS/reverse proxy.
+No están implementados todavía rate limiting ni revisión fina de logs del
+VPS/reverse proxy.

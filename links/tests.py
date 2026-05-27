@@ -11,7 +11,8 @@ import json
 from accounts.models import UserProfile
 from accounts.services import hash_api_key
 
-from .models import ShortURL, ShortURLDailyStats
+from .admin import disable_selected_links, enable_selected_links
+from .models import AbuseReport, ShortURL, ShortURLDailyStats
 from .validators import suggest_slug_variants, validate_http_https_url, validate_safe_slug
 
 
@@ -502,6 +503,122 @@ class PublicRedirectTests(TestCase):
             "https://example.com/namespaced",
             fetch_redirect_response=False,
         )
+
+
+class AbuseReportTests(TestCase):
+    def create_user(self, username: str):
+        user = User.objects.create_user(username=username, password="StrongPass123")
+        UserProfile.objects.create(user=user, public_namespace=username)
+        return user
+
+    def create_short_url(self, **overrides):
+        user = overrides.pop("owner", None) or self.create_user("owner")
+        data = {
+            "owner": user,
+            "destination_url": "https://example.com/destination",
+            "slug": "go1",
+            "public_mode": ShortURL.PublicMode.ANONYMOUS,
+        }
+        data.update(overrides)
+        return ShortURL.objects.create(**data)
+
+    def post_report(self, **overrides):
+        data = {
+            "reported_path": "/a/go1/",
+            "reason": AbuseReport.Reason.PHISHING,
+            "details": "",
+        }
+        data.update(overrides)
+        return self.client.post(reverse("abuse_report"), data)
+
+    def test_get_report_form_works(self):
+        response = self.client.get(reverse("abuse_report"), {"path": "/a/demo/"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Reportar enlace")
+        self.assertContains(response, "/a/demo/")
+
+    def test_post_report_creates_record_without_visitor_data(self):
+        self.create_short_url(slug="go1")
+
+        response = self.client.post(
+            reverse("abuse_report"),
+            {
+                "reported_path": "/a/go1/",
+                "reason": AbuseReport.Reason.PHISHING,
+                "details": "Looks suspicious.",
+            },
+            REMOTE_ADDR="203.0.113.10",
+            HTTP_USER_AGENT="test-agent",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        report = AbuseReport.objects.get()
+        self.assertEqual(report.reported_path, "/a/go1/")
+        self.assertFalse(hasattr(report, "ip_address"))
+        self.assertFalse(hasattr(report, "user_agent"))
+        self.assertFalse(hasattr(report, "email"))
+
+    def test_anonymous_report_path_resolves_short_url(self):
+        short_url = self.create_short_url(slug="anon-report")
+
+        self.post_report(reported_path="/a/anon-report/")
+
+        report = AbuseReport.objects.get()
+        self.assertEqual(report.short_url, short_url)
+
+    def test_namespaced_report_path_resolves_short_url(self):
+        user = self.create_user("space")
+        short_url = self.create_short_url(
+            owner=user,
+            slug="docs",
+            public_mode=ShortURL.PublicMode.NAMESPACE,
+        )
+
+        self.post_report(reported_path="/space/docs/")
+
+        report = AbuseReport.objects.get()
+        self.assertEqual(report.short_url, short_url)
+
+    def test_unknown_report_path_keeps_short_url_empty(self):
+        self.post_report(reported_path="/a/missing/")
+
+        report = AbuseReport.objects.get()
+        self.assertIsNone(report.short_url)
+        self.assertEqual(report.reported_path, "/a/missing/")
+
+    def test_details_limit_is_enforced(self):
+        response = self.post_report(details="x" * 1001)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ensure this value has at most 1000 characters")
+        self.assertEqual(AbuseReport.objects.count(), 0)
+
+    def test_invalid_reason_fails(self):
+        response = self.post_report(reason="not-a-reason")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(AbuseReport.objects.count(), 0)
+
+    def test_disabled_short_url_blocks_redirect(self):
+        self.create_short_url(slug="blocked", is_disabled=True)
+
+        response = self.client.get("/a/blocked/")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertContains(response, "Este enlace ya no esta disponible", status_code=404)
+
+    def test_admin_actions_disable_and_enable_links(self):
+        short_url = self.create_short_url(slug="moderate")
+        queryset = ShortURL.objects.filter(pk=short_url.pk)
+
+        disable_selected_links(None, None, queryset)
+        short_url.refresh_from_db()
+        self.assertTrue(short_url.is_disabled)
+
+        enable_selected_links(None, None, queryset)
+        short_url.refresh_from_db()
+        self.assertFalse(short_url.is_disabled)
 
 
 class ShortenAPITests(TestCase):

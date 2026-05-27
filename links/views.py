@@ -13,13 +13,14 @@ from django.shortcuts import get_object_or_404, redirect
 from django.http import JsonResponse
 from django.shortcuts import render
 
-from .forms import PasswordGateForm, ShortURLCreateForm, ShortURLEditForm
-from .models import ShortURL
+from .forms import AbuseReportForm, PasswordGateForm, ShortURLCreateForm, ShortURLEditForm
+from .models import AbuseReport, ShortURL
 from .services import (
     VISIT_INVALID_PASSWORD,
     VISIT_REDIRECT,
     resolve_anonymous_short_url,
     resolve_namespaced_short_url,
+    resolve_reported_path,
     visit_anonymous_short_url,
     visit_namespaced_short_url,
 )
@@ -163,11 +164,45 @@ def api_shorten(request):
 
 
 def unavailable(request):
-    return render(request, "links/unavailable.html", status=404)
+    return render(
+        request,
+        "links/unavailable.html",
+        {"reported_path": request.path},
+        status=404,
+    )
 
 
 def render_password_gate(request, form):
-    return render(request, "links/password_gate.html", {"form": form})
+    return render(
+        request,
+        "links/password_gate.html",
+        {
+            "form": form,
+            "reported_path": request.path,
+        },
+    )
+
+
+def abuse_report(request):
+    if request.method == "POST":
+        form = AbuseReportForm(request.POST)
+        if form.is_valid():
+            reported_path, short_url = resolve_reported_path(
+                form.cleaned_data["reported_path"],
+            )
+            AbuseReport.objects.create(
+                short_url=short_url,
+                reported_path=reported_path,
+                reason=form.cleaned_data["reason"],
+                details=form.cleaned_data["details"],
+            )
+            return render(request, "links/report_done.html")
+    else:
+        form = AbuseReportForm(
+            initial={"reported_path": request.GET.get("path", "")},
+        )
+
+    return render(request, "links/report_form.html", {"form": form})
 
 
 def handle_public_redirect(request, short_url, visit_func):

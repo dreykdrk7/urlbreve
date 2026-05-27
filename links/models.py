@@ -149,3 +149,48 @@ class ShortURLDailyStats(models.Model):
 
     def __str__(self) -> str:
         return f"{self.short_url_id}:{self.date}"
+
+
+class AbuseReport(models.Model):
+    class Reason(models.TextChoices):
+        PHISHING = "phishing", "Phishing"
+        MALWARE = "malware", "Malware"
+        SPAM = "spam", "Spam"
+        IMPERSONATION = "impersonation", "Impersonation"
+        ILLEGAL_CONTENT = "illegal_content", "Illegal content"
+        OTHER = "other", "Other"
+
+    class Status(models.TextChoices):
+        OPEN = "open", "Open"
+        REVIEWED = "reviewed", "Reviewed"
+        DISMISSED = "dismissed", "Dismissed"
+        ACTION_TAKEN = "action_taken", "Action taken"
+
+    short_url = models.ForeignKey(
+        ShortURL,
+        on_delete=models.SET_NULL,
+        related_name="abuse_reports",
+        null=True,
+        blank=True,
+    )
+    reported_path = models.CharField(max_length=512)
+    reason = models.CharField(max_length=32, choices=Reason.choices)
+    details = models.TextField(blank=True, max_length=1000)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.OPEN,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    admin_notes = models.TextField(blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["status", "created_at"], name="idx_abuse_status_created"),
+            models.Index(fields=["short_url", "status"], name="idx_abuse_url_status"),
+        ]
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.reason}:{self.reported_path}"

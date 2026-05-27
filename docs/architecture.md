@@ -17,6 +17,7 @@
 - `/a/<slug>/` - redirección pública anónima/global.
 - `/<namespace>/<slug>/` - redirección pública bajo namespace de usuario.
 - `/api/shorten/` - creación de URL corta por API JSON.
+- `/report/` - formulario publico de reporte de abuso.
 - `/admin/` - administración de Django.
 - `/healthz/` - healthcheck básico.
 
@@ -24,7 +25,7 @@ En esta microfase están activos `/`, `/register/`, `/login/`, `/logout/`,
 `/dashboard/`, `/profile/`, `/profile/api-key/rotate/`,
 `/profile/api-key/revoke/`, `/links/new/`, `/links/<id>/`,
 `/links/<id>/edit/`, `/links/<id>/delete/`, `/a/<slug>/`,
-`/<namespace>/<slug>/`, `/api/shorten/`, `/healthz/` y `/admin/`.
+`/<namespace>/<slug>/`, `/api/shorten/`, `/report/`, `/healthz/` y `/admin/`.
 
 ## Modelo de privacidad
 
@@ -141,6 +142,36 @@ correcta, se registra únicamente:
 No se guardan IPs, user-agent ni referrer en el modelo de estadísticas. Tampoco
 se guardan intentos fallidos del password gate.
 
+## Reportes de abuso y moderacion
+
+`/report/` permite crear `AbuseReport` desde una vista publica con Django
+templates. El formulario pide solo:
+
+- `reported_path`;
+- `reason`;
+- `details`, opcional y limitado.
+
+No se solicita email ni se persisten IP, user-agent, referrer u otros datos del
+visitante. En esta fase tampoco se integra captcha externo para evitar
+dependencias y tracking de terceros.
+
+Al recibir un reporte, `links.services.resolve_reported_path()` normaliza la
+ruta e intenta resolver:
+
+- `/a/<slug>/` contra enlaces `anonymous`;
+- `/<namespace>/<slug>/` contra `UserProfile.public_namespace` y enlaces
+  `namespace`.
+
+Si la ruta se resuelve, `AbuseReport.short_url` apunta al enlace. Si no, el
+reporte se conserva con `short_url=None` y `reported_path` normalizado para
+revision manual.
+
+El admin registra `AbuseReport` y permite filtrar por estado, motivo y fecha.
+`ShortURLAdmin` incluye acciones para deshabilitar o rehabilitar enlaces
+seleccionados. Deshabilitar un enlace marca `ShortURL.is_disabled=True`; la
+redireccion publica ya lo bloquea mediante `ShortURL.is_available` sin revelar
+al visitante el motivo exacto.
+
 ## API pública inicial
 
 `POST /api/shorten/` usa Django puro y `JsonResponse`. No se introduce Django
@@ -250,7 +281,6 @@ tracking invasivo. Opciones a evaluar:
 ## Decisiones pendientes
 
 - flujo de creación anónima;
-- formulario o proceso de reporte de abuso;
 - política exacta de logs en reverse proxy;
 - borrado lógico frente a reutilización futura de slugs;
 - límites de uso compatibles con la política privacy-first.
