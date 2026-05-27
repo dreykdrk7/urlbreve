@@ -113,6 +113,28 @@
       line-height: 1.15;
     }
 
+    .home-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+      gap: 32px;
+      align-items: start;
+    }
+
+    .privacy-points {
+      display: grid;
+      gap: 10px;
+      max-width: 660px;
+      margin: 28px 0 0;
+      padding: 0;
+      list-style: none;
+      color: var(--muted);
+    }
+
+    .privacy-points li {
+      padding-left: 14px;
+      border-left: 3px solid var(--accent);
+    }
+
     .messages {
       display: grid;
       gap: 8px;
@@ -275,6 +297,45 @@
       color: var(--muted);
     }
 
+    .result-box {
+      display: grid;
+      gap: 12px;
+      margin-top: 24px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #eef6f4;
+    }
+
+    .result-url {
+      display: block;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+      color: var(--accent);
+    }
+
+    .meta-list {
+      display: grid;
+      gap: 6px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .meta-list div {
+      display: grid;
+      gap: 2px;
+    }
+
+    .meta-list dt {
+      font-weight: 650;
+      color: var(--ink);
+    }
+
+    .meta-list dd {
+      margin: 0;
+    }
+
     .actions {
       display: flex;
       gap: 12px;
@@ -312,6 +373,16 @@
       border-top: 1px solid var(--line);
       color: var(--muted);
       font-size: 0.95rem;
+    }
+
+    @media (max-width: 760px) {
+      .home-grid {
+        grid-template-columns: 1fr;
+      }
+
+      main {
+        padding: 40px 0;
+      }
     }
   </style>
 </head>

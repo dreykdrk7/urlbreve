@@ -278,6 +278,7 @@ Límites activos:
   `URLBREVE_ANONYMOUS_API_ENABLED=False`, devuelve `403`.
 - `POST /api/shorten/` con `X-API-Key`: por usuario resuelto desde la API key.
 - `/links/new/`: por usuario autenticado.
+- `/`: creación anónima web por sesión Django.
 - `/report/`: por sesión Django.
 - Password gate: por sesión Django y `ShortURL.id`.
 
@@ -291,8 +292,8 @@ no se incrementan estadísticas.
 
 Limitaciones:
 
-- La API anónima se limita por sesión/cookie. Clientes que descartan cookies
-  pueden evadir este límite.
+- La API anónima y la creación anónima web se limitan por sesión/cookie.
+  Clientes que descartan cookies pueden evadir este límite.
 - El cache local solo coordina límites dentro de una instancia. Varias
   instancias necesitarán cache compartida.
 - No hay honeypot todavía.
@@ -339,7 +340,7 @@ Estado: implementada.
 - Settings añadidos.
 - Contadores en cache por usuario autenticado.
 - Contadores en cache por usuario resuelto desde API key.
-- Contadores por sesión para `/report/` y password gate.
+- Contadores por sesión para creación anónima web, `/report/` y password gate.
 - `429 Too Many Requests` para API cuando corresponde.
 - Tests de límites y bypass con `URLBREVE_RATE_LIMITING_ENABLED=False`.
 

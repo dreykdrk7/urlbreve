@@ -14,7 +14,13 @@ from django.shortcuts import get_object_or_404, redirect
 from django.http import JsonResponse
 from django.shortcuts import render
 
-from .forms import AbuseReportForm, PasswordGateForm, ShortURLCreateForm, ShortURLEditForm
+from .forms import (
+    AbuseReportForm,
+    AnonymousShortURLCreateForm,
+    PasswordGateForm,
+    ShortURLCreateForm,
+    ShortURLEditForm,
+)
 from .models import AbuseReport, ShortURL
 from .rate_limits import (
     consume_password_gate_limit,
@@ -35,7 +41,36 @@ from .validators import suggest_slug_variants, validate_safe_slug
 
 
 def home(request):
-    return render(request, "home.html")
+    created_short_url = None
+    if request.method == "POST":
+        form = AnonymousShortURLCreateForm(request.POST)
+        if form.is_valid():
+            limit_result = consume_session_daily_limit(
+                request,
+                "web-anonymous-shorten",
+                settings.URLBREVE_ANONYMOUS_DAILY_LIMIT,
+            )
+            if limit_result.allowed:
+                created_short_url = form.save()
+                form = AnonymousShortURLCreateForm()
+            else:
+                form.add_error(None, "Has alcanzado el limite diario de creacion anonima.")
+    else:
+        form = AnonymousShortURLCreateForm()
+
+    return render(
+        request,
+        "home.html",
+        {
+            "form": form,
+            "created_short_url": created_short_url,
+            "created_public_url": (
+                created_short_url.get_public_url(request)
+                if created_short_url
+                else ""
+            ),
+        },
+    )
 
 
 def healthz(request):

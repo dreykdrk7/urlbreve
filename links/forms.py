@@ -10,7 +10,7 @@ from .services import generate_random_slug, slug_is_available
 from .validators import suggest_slug_variants
 
 
-class ShortURLCreateForm(forms.ModelForm):
+class BaseShortURLCreateForm(forms.ModelForm):
     slug = forms.CharField(max_length=64, required=False, strip=False)
     expires_days = forms.IntegerField(
         label="Dias hasta expirar",
@@ -26,6 +26,72 @@ class ShortURLCreateForm(forms.ModelForm):
         widget=forms.PasswordInput(render_value=False),
     )
 
+    owner = None
+
+    def get_owner(self):
+        return self.owner
+
+    def get_public_mode(self):
+        return self.cleaned_data.get("public_mode") or ShortURL.PublicMode.ANONYMOUS
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        public_mode = self.get_public_mode()
+        slug = cleaned_data.get("slug")
+        owner = self.get_owner()
+
+        if public_mode == ShortURL.PublicMode.NAMESPACE and owner is None:
+            self.add_error("public_mode", "Namespace mode requires an authenticated owner.")
+            return cleaned_data
+
+        if (
+            public_mode == ShortURL.PublicMode.NAMESPACE
+            and not owner.profile.public_namespace
+        ):
+            self.add_error("public_mode", "Namespace mode requires a public namespace.")
+            return cleaned_data
+
+        if public_mode and slug:
+            if not slug_is_available(slug, public_mode, owner=owner):
+                suggestions = ", ".join(suggest_slug_variants(slug))
+                self.add_error(
+                    "slug",
+                    f"This slug is already in use. Try: {suggestions}.",
+                )
+        elif public_mode:
+            cleaned_data["slug"] = generate_random_slug(public_mode, owner=owner)
+
+        expires_days = cleaned_data.get("expires_days") or 0
+        cleaned_data["expires_at"] = (
+            timezone.now() + timedelta(days=expires_days)
+            if expires_days > 0
+            else None
+        )
+        cleaned_data["max_clicks"] = cleaned_data.get("max_clicks") or 0
+        cleaned_data["public_mode"] = public_mode
+        return cleaned_data
+
+    def save(self, commit: bool = True):
+        instance = super().save(commit=False)
+        instance.owner = self.get_owner()
+        instance.slug = self.cleaned_data["slug"]
+        instance.public_mode = self.cleaned_data["public_mode"]
+        instance.expires_at = self.cleaned_data["expires_at"]
+        instance.max_clicks = self.cleaned_data["max_clicks"]
+
+        password = self.cleaned_data.get("password")
+        if password:
+            instance.password_hash = make_password(password)
+
+        if commit:
+            instance.save()
+        return instance
+
+
+class ShortURLCreateForm(BaseShortURLCreateForm):
     class Meta:
         model = ShortURL
         fields = (
@@ -54,48 +120,20 @@ class ShortURLCreateForm(forms.ModelForm):
             else ShortURL.PublicMode.ANONYMOUS
         )
 
-    def clean(self):
-        cleaned_data = super().clean()
-        public_mode = cleaned_data.get("public_mode")
-        slug = cleaned_data.get("slug")
 
-        if public_mode == ShortURL.PublicMode.NAMESPACE and not self.profile.public_namespace:
-            self.add_error("public_mode", "Namespace mode requires a public namespace.")
-            return cleaned_data
-
-        if public_mode and slug:
-            if not slug_is_available(slug, public_mode, owner=self.owner):
-                suggestions = ", ".join(suggest_slug_variants(slug))
-                self.add_error(
-                    "slug",
-                    f"This slug is already in use. Try: {suggestions}.",
-                )
-        elif public_mode:
-            cleaned_data["slug"] = generate_random_slug(public_mode, owner=self.owner)
-
-        expires_days = cleaned_data.get("expires_days") or 0
-        cleaned_data["expires_at"] = (
-            timezone.now() + timedelta(days=expires_days)
-            if expires_days > 0
-            else None
+class AnonymousShortURLCreateForm(BaseShortURLCreateForm):
+    class Meta:
+        model = ShortURL
+        fields = (
+            "destination_url",
+            "slug",
+            "max_clicks",
         )
-        cleaned_data["max_clicks"] = cleaned_data.get("max_clicks") or 0
-        return cleaned_data
-
-    def save(self, commit: bool = True):
-        instance = super().save(commit=False)
-        instance.owner = self.owner
-        instance.slug = self.cleaned_data["slug"]
-        instance.expires_at = self.cleaned_data["expires_at"]
-        instance.max_clicks = self.cleaned_data["max_clicks"]
-
-        password = self.cleaned_data.get("password")
-        if password:
-            instance.password_hash = make_password(password)
-
-        if commit:
-            instance.save()
-        return instance
+        labels = {
+            "destination_url": "URL destino",
+            "slug": "Slug",
+            "max_clicks": "Limite de clicks",
+        }
 
 
 class ShortURLEditForm(forms.ModelForm):

@@ -233,6 +233,89 @@ class ShortURLManagementTests(TestCase):
         self.assertNotContains(dashboard, "/a/hide-me/")
 
 
+class AnonymousWebShortenerTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
+    def post_home(self, **overrides):
+        data = {
+            "destination_url": "https://example.com/page",
+            "slug": "webanon",
+            "expires_days": "0",
+            "max_clicks": "0",
+            "password": "",
+        }
+        data.update(overrides)
+        return self.client.post(reverse("home"), data)
+
+    def test_anonymous_user_can_create_url_from_home(self):
+        response = self.post_home(slug="webanon")
+
+        self.assertEqual(response.status_code, 200)
+        short_url = ShortURL.objects.get(slug="webanon")
+        self.assertIsNone(short_url.owner)
+        self.assertEqual(short_url.public_mode, ShortURL.PublicMode.ANONYMOUS)
+        self.assertContains(response, "http://testserver/a/webanon/")
+        self.assertContains(response, "Copiar")
+
+    def test_blank_slug_generates_code_from_home(self):
+        response = self.post_home(slug="")
+
+        self.assertEqual(response.status_code, 200)
+        short_url = ShortURL.objects.get()
+        self.assertIsNone(short_url.owner)
+        self.assertEqual(len(short_url.slug), 8)
+        validate_safe_slug(short_url.slug)
+
+    def test_optional_password_is_hashed_from_home(self):
+        response = self.post_home(slug="secretweb", password="secret")
+
+        self.assertEqual(response.status_code, 200)
+        short_url = ShortURL.objects.get(slug="secretweb")
+        self.assertTrue(short_url.password_hash)
+        self.assertNotEqual(short_url.password_hash, "secret")
+        self.assertContains(response, "Si")
+
+    @override_settings(URLBREVE_ANONYMOUS_DAILY_LIMIT=1)
+    def test_anonymous_web_rate_limit_returns_form_error(self):
+        first = self.post_home(slug="limitweb1")
+        second = self.post_home(slug="limitweb2")
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertContains(second, "Has alcanzado el limite diario de creacion anonima.")
+        self.assertEqual(ShortURL.objects.count(), 1)
+
+    def test_slug_collision_returns_suggestions(self):
+        ShortURL.objects.create(
+            destination_url="https://example.com/one",
+            slug="taken",
+            public_mode=ShortURL.PublicMode.ANONYMOUS,
+        )
+
+        response = self.post_home(slug="taken")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "This slug is already in use")
+        self.assertContains(response, "taken-2")
+        self.assertEqual(ShortURL.objects.filter(slug="taken").count(), 1)
+
+    def test_namespace_mode_is_not_allowed_in_anonymous_form(self):
+        response = self.post_home(
+            slug="forcedanon",
+            public_mode=ShortURL.PublicMode.NAMESPACE,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        short_url = ShortURL.objects.get(slug="forcedanon")
+        self.assertIsNone(short_url.owner)
+        self.assertEqual(short_url.public_mode, ShortURL.PublicMode.ANONYMOUS)
+        self.assertNotIn("public_mode", response.context["form"].fields)
+
+
 class PublicRedirectTests(TestCase):
     def create_user(self, username: str):
         user = User.objects.create_user(username=username, password="StrongPass123")

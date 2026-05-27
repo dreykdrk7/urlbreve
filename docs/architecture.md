@@ -2,7 +2,7 @@
 
 ## Rutas previstas
 
-- `/` - home simple.
+- `/` - home con creación anónima rápida.
 - `/register/` - registro de usuario.
 - `/login/` - login.
 - `/logout/` - logout mediante POST.
@@ -89,6 +89,30 @@ Campos no editables después de crear:
 La contraseña queda guardada como hash en `password_hash`. El flujo público
 muestra un formulario de contraseña solo cuando el enlace existe y está
 disponible.
+
+## Creación anónima web
+
+La home `/` expone un formulario de creación sin login. Este flujo crea
+`ShortURL` con:
+
+- `owner=None`;
+- `public_mode=anonymous`;
+- ruta pública `/a/<slug>/`;
+- `destination_url`;
+- `slug`, opcional;
+- `expires_days`;
+- `max_clicks`;
+- `password`, opcional.
+
+No permite namespace, título ni asociación posterior a una cuenta. El enlace no
+aparece en dashboard, no puede editarse desde la UI autenticada y no tiene flujo
+de recuperación. La página de resultado muestra la URL corta, expiración, límite
+de clicks y si está protegida por contraseña.
+
+El formulario anónimo reutiliza la misma base de validación que la creación
+autenticada: URL destino `http://`/`https://`, slugs ASCII conservadores,
+sugerencias de colisión, generación aleatoria de 8 caracteres y guardado de
+contraseña solo como hash.
 
 ## Soft delete y disponibilidad
 
@@ -278,6 +302,7 @@ La implementación actual usa Django cache con ventana diaria basada en
 `timezone.localdate()` y claves por entidad:
 
 - creación web: `request.user.id`;
+- creación anónima web: sesión Django;
 - API con `X-API-Key`: usuario resuelto desde la clave;
 - API anónima: sesión Django;
 - reportes: sesión Django;

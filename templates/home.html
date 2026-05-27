@@ -3,18 +3,122 @@
 {% block title %}urlbreve - acortador privacy-first{% endblock %}
 
 {% block content %}
-  <h1>urlbreve</h1>
-  <p class="lead">
-    Un acortador de URLs open source y privacy-first, construido con Django
-    y pensado para despliegues sencillos en VPS.
-  </p>
-  <div class="actions">
-    {% if request.user.is_authenticated %}
-      <a class="button" href="{% url 'accounts:dashboard' %}">Dashboard</a>
-    {% else %}
-      <a class="button" href="{% url 'accounts:register' %}">Crear cuenta</a>
-      <a class="button secondary" href="{% url 'accounts:login' %}">Entrar</a>
-    {% endif %}
-    <a class="button secondary" href="/healthz/">Estado</a>
+  <div class="home-grid">
+    <section>
+      <h1>urlbreve</h1>
+      <p class="lead">
+        Acorta enlaces sin trackers, sin analytics invasivos y sin perfiles de
+        visitantes. Open source, Django puro y preparado para VPS.
+      </p>
+      <ul class="privacy-points">
+        <li>Enlaces anonimos con ruta publica /a/&lt;slug&gt;/.</li>
+        <li>No guardamos IP, user-agent, referrer ni geolocalizacion.</li>
+        <li>Codigo auditable y licencia AGPLv3.</li>
+      </ul>
+      <div class="actions">
+        {% if request.user.is_authenticated %}
+          <a class="button secondary" href="{% url 'accounts:dashboard' %}">Dashboard</a>
+        {% else %}
+          <a class="button secondary" href="{% url 'accounts:register' %}">Crear cuenta</a>
+          <a class="button secondary" href="{% url 'accounts:login' %}">Entrar</a>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="quick-shortener-title">
+      <h1 id="quick-shortener-title">Crear enlace anonimo</h1>
+      <p class="lead">
+        No tendras panel ni recuperacion posterior para este enlace.
+      </p>
+
+      {% if created_short_url %}
+        <div class="result-box">
+          <a class="result-url" href="{{ created_short_url.get_public_path }}">{{ created_public_url }}</a>
+          <button class="button" type="button" data-copy="{{ created_public_url }}">Copiar</button>
+          <dl class="meta-list">
+            <div>
+              <dt>Expiracion</dt>
+              <dd>{% if created_short_url.expires_at %}{{ created_short_url.expires_at }}{% else %}Nunca{% endif %}</dd>
+            </div>
+            <div>
+              <dt>Limite de clicks</dt>
+              <dd>{% if created_short_url.max_clicks %}{{ created_short_url.max_clicks }}{% else %}Ilimitado{% endif %}</dd>
+            </div>
+            <div>
+              <dt>Protegido con contrasena</dt>
+              <dd>{% if created_short_url.password_hash %}Si{% else %}No{% endif %}</dd>
+            </div>
+          </dl>
+        </div>
+      {% endif %}
+
+      <form class="form" method="post">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+          <div class="form-errors">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="field">
+          {{ form.destination_url.label_tag }}
+          {{ form.destination_url }}
+          {% for error in form.destination_url.errors %}
+            <div class="field-error">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+        <div class="field">
+          {{ form.slug.label_tag }}
+          {{ form.slug }}
+          <div class="help-text">Opcional. Si lo dejas vacio, generamos uno.</div>
+          {% for error in form.slug.errors %}
+            <div class="field-error">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+        <div class="field">
+          {{ form.expires_days.label_tag }}
+          {{ form.expires_days }}
+          <div class="help-text">0 significa que no expira.</div>
+          {% for error in form.expires_days.errors %}
+            <div class="field-error">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+        <div class="field">
+          {{ form.max_clicks.label_tag }}
+          {{ form.max_clicks }}
+          <div class="help-text">0 significa ilimitado.</div>
+          {% for error in form.max_clicks.errors %}
+            <div class="field-error">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+        <div class="field">
+          {{ form.password.label_tag }}
+          {{ form.password }}
+          <div class="help-text">Opcional. Solo guardamos el hash.</div>
+          {% for error in form.password.errors %}
+            <div class="field-error">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+        <div class="actions">
+          <button class="button" type="submit">Acortar</button>
+        </div>
+      </form>
+    </section>
   </div>
+
+  <script>
+    document.querySelectorAll("[data-copy]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(button.dataset.copy);
+          button.textContent = "Copiado";
+        } catch {
+          button.textContent = "No copiado";
+        }
+      });
+    });
+  </script>
 {% endblock %}

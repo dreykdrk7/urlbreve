@@ -61,7 +61,7 @@ docker compose run --rm web python manage.py test
 
 ## Rutas activas
 
-- `/` - home simple.
+- `/` - home con creación anónima rápida.
 - `/register/` - registro.
 - `/login/` - login.
 - `/logout/` - logout mediante POST.
@@ -113,6 +113,22 @@ Reglas de colisión:
 - modo `namespace`: `slug` único por usuario para la ruta conceptual
   `/<namespace>/<slug>/`;
 - si un slug manual colisiona, se devuelve un error con sugerencias.
+
+## Creación anónima web
+
+La home `/` permite crear enlaces anónimos sin iniciar sesión. Estos enlaces:
+
+- usan siempre `public_mode=anonymous`;
+- quedan con `owner=None`;
+- tienen ruta pública `/a/<slug>/`;
+- pueden tener slug opcional, expiración, límite de clicks y contraseña;
+- no aparecen en ningún dashboard;
+- no tienen recuperación ni edición posterior.
+
+La creación anónima web reutiliza las mismas validaciones de destino, slug,
+colisiones, generación aleatoria y hash de contraseña que la creación
+autenticada. También usa el rate limiting privacy-first por sesión con
+`URLBREVE_ANONYMOUS_DAILY_LIMIT`.
 
 ## Redirecciones públicas
 
@@ -169,6 +185,7 @@ documentada en `docs/rate-limiting-privacy-first.md`.
 Límites activos:
 
 - creación anónima por API, basada en sesión Django y desactivable por setting;
+- creación anónima web, basada en sesión Django;
 - creación por API key, limitada por usuario resuelto desde `X-API-Key`;
 - creación web autenticada, limitada por `request.user.id`;
 - reportes de abuso, limitados por sesión;
@@ -230,6 +247,7 @@ Microfase actual:
 - dashboard privado mínimo;
 - edición de namespace público y preferencia de modo;
 - creación, listado, detalle, edición limitada y soft delete de URLs propias;
+- creación anónima web sin recuperación posterior;
 - redirecciones públicas con contador agregado diario;
 - enlaces protegidos con contraseña;
 - API mínima de creación con `X-API-Key`;
