@@ -192,11 +192,18 @@ Límites activos:
 - creación web autenticada, limitada por `request.user.id`;
 - reportes de abuso, limitados por sesión;
 - honeypot silencioso en reportes de abuso;
-- password gate, limitado por sesión y enlace.
+- password gate, limitado por sesión y enlace;
+- cooldown corto por `ShortURL.id` para enlaces con demasiados intentos de
+  contraseña.
 
 La protección de API anónima es deliberadamente imperfecta: clientes que no
 conservan cookies pueden esquivar el límite de sesión. En producción se puede
 desactivar la API anónima o mantenerla con límites bajos.
+
+El cooldown por enlace del password gate cuenta todos los POST válidos de
+contraseña, correctos o incorrectos. Cuando se supera, urlbreve no comprueba la
+contraseña, no redirige y no incrementa estadísticas. La clave de cache se basa
+solo en el enlace, no en IP, user-agent, referrer ni fingerprinting.
 
 ## API
 
@@ -258,8 +265,10 @@ Microfase actual:
 - honeypot anti-spam en reportes sin captcha externo;
 - moderacion basica con `is_disabled`;
 - Fase 1 de rate limiting privacy-first sin IP;
+- cooldown por enlace para password gate sin IP;
 - página inicial y endpoint `/healthz/`;
 - documentación y licencia AGPLv3.
 
-No están implementados todavía cooldown avanzado por enlace,
-cache compartida/Redis ni la revisión fina de logs del VPS/reverse proxy.
+No están implementados todavía cache compartida/Redis, límites por
+`reported_path`, bloqueo futuro de dominios abusivos ni la revisión fina de logs
+del VPS/reverse proxy.

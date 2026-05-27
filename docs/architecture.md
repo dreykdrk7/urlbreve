@@ -311,13 +311,22 @@ La implementación actual usa Django cache con ventana diaria basada en
 - reportes: sesión Django;
 - password gate: sesión Django + `ShortURL.id`.
 
-El password gate cuenta todos los POST válidos de contraseña, tanto correctos
-como incorrectos. Al superar el límite, no se comprueba la contraseña y no se
-registra click.
+El password gate tiene dos capas:
+
+- límite diario por sesión Django + `ShortURL.id`;
+- cooldown corto por `ShortURL.id`, útil aunque el cliente descarte cookies.
+
+Ambas capas cuentan todos los POST válidos de contraseña, tanto correctos como
+incorrectos. El cooldown por enlace se consume antes de comprobar la contraseña.
+Al superar cualquiera de los límites, no se comprueba la contraseña, no se
+redirige y no se registran clicks ni estadísticas diarias.
 
 La API anónima puede desactivarse con `URLBREVE_ANONYMOUS_API_ENABLED`. Si está
 activa, el límite por sesión no detiene clientes que descartan cookies; por eso
 debe mantenerse bajo en producción.
+
+El cooldown por enlace no persiste intentos en base de datos y sus claves de
+cache no incluyen IP, user-agent, referrer ni fingerprinting.
 
 Settings actuales:
 
@@ -328,15 +337,17 @@ Settings actuales:
 - `URLBREVE_API_KEY_DAILY_LIMIT`;
 - `URLBREVE_REPORT_SESSION_DAILY_LIMIT`;
 - `URLBREVE_REPORT_HONEYPOT_ENABLED`;
-- `URLBREVE_PASSWORD_GATE_SESSION_LIMIT`.
+- `URLBREVE_PASSWORD_GATE_SESSION_LIMIT`;
+- `URLBREVE_PASSWORD_GATE_LINK_COOLDOWN_ENABLED`;
+- `URLBREVE_PASSWORD_GATE_LINK_COOLDOWN_LIMIT`;
+- `URLBREVE_PASSWORD_GATE_LINK_COOLDOWN_SECONDS`.
 
-Siguen pendientes cooldown avanzado por enlace, Redis o cache compartida para
-varias instancias y protección temporal de infraestructura sin access logs
-persistentes.
+Siguen pendientes Redis o cache compartida para varias instancias, límites por
+`reported_path`, bloqueo futuro de dominios abusivos y protección temporal de
+infraestructura sin access logs persistentes.
 
 ## Decisiones pendientes
 
-- flujo de creación anónima;
 - política exacta de logs en reverse proxy;
 - borrado lógico frente a reutilización futura de slugs;
 - siguientes fases de anti-abuse compatibles con la política privacy-first.

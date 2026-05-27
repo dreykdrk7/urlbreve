@@ -32,6 +32,10 @@ def _cache_key(scope: str, identifier: str) -> str:
     return f"urlbreve:rate-limit:{today}:{scope}:{identifier}"
 
 
+def _window_cache_key(scope: str, identifier: str) -> str:
+    return f"urlbreve:rate-limit:window:{scope}:{identifier}"
+
+
 def consume_daily_limit(scope: str, identifier: str | int, limit: int) -> RateLimitResult:
     if not rate_limiting_enabled() or limit <= 0:
         return RateLimitResult(allowed=True, count=0, limit=limit)
@@ -43,6 +47,25 @@ def consume_daily_limit(scope: str, identifier: str | int, limit: int) -> RateLi
         count = cache.incr(key)
     except ValueError:
         cache.set(key, 1, timeout=timeout)
+        count = 1
+    return RateLimitResult(allowed=count <= limit, count=count, limit=limit)
+
+
+def consume_window_limit(
+    scope: str,
+    identifier: str | int,
+    limit: int,
+    seconds: int,
+) -> RateLimitResult:
+    if not rate_limiting_enabled() or limit <= 0 or seconds <= 0:
+        return RateLimitResult(allowed=True, count=0, limit=limit)
+
+    key = _window_cache_key(scope, str(identifier))
+    cache.add(key, 0, timeout=seconds)
+    try:
+        count = cache.incr(key)
+    except ValueError:
+        cache.set(key, 1, timeout=seconds)
         count = 1
     return RateLimitResult(allowed=count <= limit, count=count, limit=limit)
 
@@ -70,3 +93,18 @@ def consume_password_gate_limit(request, short_url_id: int, limit: int) -> RateL
     session_key = get_or_create_session_key(request)
     identifier = f"session:{session_key}:short-url:{short_url_id}"
     return consume_daily_limit("password-gate", identifier, limit)
+
+
+def consume_password_gate_link_cooldown(short_url_id: int) -> RateLimitResult:
+    if not settings.URLBREVE_PASSWORD_GATE_LINK_COOLDOWN_ENABLED:
+        return RateLimitResult(
+            allowed=True,
+            count=0,
+            limit=settings.URLBREVE_PASSWORD_GATE_LINK_COOLDOWN_LIMIT,
+        )
+    return consume_window_limit(
+        "password-gate-link",
+        f"short-url:{short_url_id}",
+        settings.URLBREVE_PASSWORD_GATE_LINK_COOLDOWN_LIMIT,
+        settings.URLBREVE_PASSWORD_GATE_LINK_COOLDOWN_SECONDS,
+    )

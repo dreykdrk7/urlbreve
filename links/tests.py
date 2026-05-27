@@ -832,6 +832,16 @@ class RateLimitTests(TestCase):
         UserProfile.objects.create(user=user, public_namespace=username)
         return user
 
+    def create_password_short_url(self, slug: str = "protected"):
+        user = self.create_user(f"owner{slug}")
+        return ShortURL.objects.create(
+            owner=user,
+            destination_url=f"https://example.com/{slug}",
+            slug=slug,
+            public_mode=ShortURL.PublicMode.ANONYMOUS,
+            password_hash=make_password("secret"),
+        )
+
     def create_user_with_api_key(self, username: str = "apiuser"):
         raw_key = f"ub_test_{username}"
         user = User.objects.create_user(username=username, password="StrongPass123")
@@ -946,14 +956,7 @@ class RateLimitTests(TestCase):
 
     @override_settings(URLBREVE_PASSWORD_GATE_SESSION_LIMIT=1)
     def test_password_gate_over_limit_does_not_redirect_even_with_correct_password(self):
-        user = self.create_user("protected")
-        short_url = ShortURL.objects.create(
-            owner=user,
-            destination_url="https://example.com/secret",
-            slug="secret",
-            public_mode=ShortURL.PublicMode.ANONYMOUS,
-            password_hash=make_password("secret"),
-        )
+        short_url = self.create_password_short_url(slug="secret")
 
         first = self.client.post("/a/secret/", {"password": "wrong"})
         second = self.client.post("/a/secret/", {"password": "secret"})
@@ -964,6 +967,104 @@ class RateLimitTests(TestCase):
         short_url.refresh_from_db()
         self.assertEqual(short_url.click_count, 0)
         self.assertFalse(ShortURLDailyStats.objects.filter(short_url=short_url).exists())
+
+    @override_settings(
+        URLBREVE_PASSWORD_GATE_SESSION_LIMIT=10,
+        URLBREVE_PASSWORD_GATE_LINK_COOLDOWN_LIMIT=2,
+        URLBREVE_PASSWORD_GATE_LINK_COOLDOWN_SECONDS=300,
+    )
+    def test_password_correct_redirects_under_link_cooldown_limit(self):
+        short_url = self.create_password_short_url(slug="underlimit")
+
+        response = self.client.post("/a/underlimit/", {"password": "secret"})
+
+        self.assertRedirects(
+            response,
+            "https://example.com/underlimit",
+            fetch_redirect_response=False,
+        )
+        short_url.refresh_from_db()
+        self.assertEqual(short_url.click_count, 1)
+
+    @override_settings(
+        URLBREVE_PASSWORD_GATE_SESSION_LIMIT=10,
+        URLBREVE_PASSWORD_GATE_LINK_COOLDOWN_LIMIT=2,
+        URLBREVE_PASSWORD_GATE_LINK_COOLDOWN_SECONDS=300,
+    )
+    def test_password_gate_link_cooldown_blocks_correct_password_and_stats(self):
+        short_url = self.create_password_short_url(slug="cooldown")
+
+        self.client.post("/a/cooldown/", {"password": "wrong"})
+        self.client.post("/a/cooldown/", {"password": "wrong"})
+        response = self.client.post("/a/cooldown/", {"password": "secret"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Demasiados intentos. Intentalo mas tarde.")
+        short_url.refresh_from_db()
+        self.assertEqual(short_url.click_count, 0)
+        self.assertFalse(ShortURLDailyStats.objects.filter(short_url=short_url).exists())
+
+    @override_settings(
+        URLBREVE_PASSWORD_GATE_SESSION_LIMIT=10,
+        URLBREVE_PASSWORD_GATE_LINK_COOLDOWN_LIMIT=1,
+        URLBREVE_PASSWORD_GATE_LINK_COOLDOWN_SECONDS=300,
+    )
+    def test_password_gate_link_cooldown_does_not_block_other_links(self):
+        first = self.create_password_short_url(slug="firstcool")
+        second = self.create_password_short_url(slug="secondcool")
+
+        self.client.post("/a/firstcool/", {"password": "wrong"})
+        blocked = self.client.post("/a/firstcool/", {"password": "secret"})
+        second_response = self.client.post("/a/secondcool/", {"password": "secret"})
+
+        self.assertEqual(blocked.status_code, 200)
+        self.assertRedirects(
+            second_response,
+            "https://example.com/secondcool",
+            fetch_redirect_response=False,
+        )
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(first.click_count, 0)
+        self.assertEqual(second.click_count, 1)
+
+    @override_settings(
+        URLBREVE_PASSWORD_GATE_SESSION_LIMIT=10,
+        URLBREVE_PASSWORD_GATE_LINK_COOLDOWN_ENABLED=False,
+        URLBREVE_PASSWORD_GATE_LINK_COOLDOWN_LIMIT=1,
+    )
+    def test_password_gate_link_cooldown_can_be_disabled(self):
+        short_url = self.create_password_short_url(slug="disabledcool")
+
+        self.client.post("/a/disabledcool/", {"password": "wrong"})
+        response = self.client.post("/a/disabledcool/", {"password": "secret"})
+
+        self.assertRedirects(
+            response,
+            "https://example.com/disabledcool",
+            fetch_redirect_response=False,
+        )
+        short_url.refresh_from_db()
+        self.assertEqual(short_url.click_count, 1)
+
+    @override_settings(
+        URLBREVE_RATE_LIMITING_ENABLED=False,
+        URLBREVE_PASSWORD_GATE_SESSION_LIMIT=1,
+        URLBREVE_PASSWORD_GATE_LINK_COOLDOWN_LIMIT=1,
+    )
+    def test_password_gate_cooldown_disabled_with_global_rate_limit_switch(self):
+        short_url = self.create_password_short_url(slug="globaloff")
+
+        self.client.post("/a/globaloff/", {"password": "wrong"})
+        response = self.client.post("/a/globaloff/", {"password": "secret"})
+
+        self.assertRedirects(
+            response,
+            "https://example.com/globaloff",
+            fetch_redirect_response=False,
+        )
+        short_url.refresh_from_db()
+        self.assertEqual(short_url.click_count, 1)
 
     @override_settings(
         URLBREVE_RATE_LIMITING_ENABLED=False,

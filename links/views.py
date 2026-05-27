@@ -23,6 +23,7 @@ from .forms import (
 )
 from .models import AbuseReport, ShortURL
 from .rate_limits import (
+    consume_password_gate_link_cooldown,
     consume_password_gate_limit,
     consume_session_daily_limit,
     consume_user_daily_limit,
@@ -283,6 +284,10 @@ def handle_public_redirect(request, short_url, visit_func):
         if request.method == "POST":
             form = PasswordGateForm(request.POST)
             if form.is_valid():
+                link_limit_result = consume_password_gate_link_cooldown(short_url.pk)
+                if not link_limit_result.allowed:
+                    form.add_error("password", "Demasiados intentos. Intentalo mas tarde.")
+                    return render_password_gate(request, form)
                 limit_result = consume_password_gate_limit(
                     request,
                     short_url.pk,

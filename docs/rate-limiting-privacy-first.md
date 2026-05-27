@@ -281,14 +281,26 @@ Límites activos:
 - `/`: creación anónima web por sesión Django.
 - `/report/`: por sesión Django.
 - Password gate: por sesión Django y `ShortURL.id`.
+- Password gate: cooldown corto por `ShortURL.id`.
 
 Cuando se supera un límite, la API devuelve `429` JSON. Los formularios web
 muestran error de formulario y no crean registros ni redirigen.
 
 El password gate cuenta todos los POST válidos de contraseña, correctos o
 incorrectos. Esta decisión reduce fuerza bruta sin revelar si una contraseña era
-válida. Si se supera el límite, no se comprueba la contraseña, no se redirige y
-no se incrementan estadísticas.
+válida. Primero se consume el cooldown corto por enlace y después el límite por
+sesión + enlace. Si se supera cualquiera de los dos, no se comprueba la
+contraseña, no se redirige y no se incrementan estadísticas.
+
+Cooldown por enlace:
+
+- se basa solo en `ShortURL.id`;
+- usa una ventana corta en Django cache;
+- funciona aunque el cliente descarte cookies;
+- puede bloquear temporalmente a usuarios legítimos si un enlace concreto está
+  bajo ataque;
+- no persiste intentos en DB;
+- no usa IP, user-agent, referrer ni fingerprinting.
 
 Honeypot en reportes:
 
@@ -321,6 +333,11 @@ proyecto:
 - `URLBREVE_REPORT_SESSION_DAILY_LIMIT`: límite diario de reportes por sesión.
 - `URLBREVE_REPORT_HONEYPOT_ENABLED`: activa honeypot silencioso en `/report/`.
 - `URLBREVE_PASSWORD_GATE_SESSION_LIMIT`: intentos por sesión antes de cooldown.
+- `URLBREVE_PASSWORD_GATE_LINK_COOLDOWN_ENABLED`: activa cooldown por enlace en
+  password gate.
+- `URLBREVE_PASSWORD_GATE_LINK_COOLDOWN_LIMIT`: POST válidos permitidos por
+  enlace dentro de la ventana corta.
+- `URLBREVE_PASSWORD_GATE_LINK_COOLDOWN_SECONDS`: duración de esa ventana corta.
 
 Los límites numéricos `<= 0` se tratan como ilimitados para esa capa concreta.
 
@@ -353,10 +370,12 @@ Estado: implementada.
 
 ### Fase 2: honeypot y cooldown por enlace
 
-Estado: honeypot de `/report/` implementado; cooldown avanzado pendiente.
+Estado: honeypot de `/report/` implementado; cooldown por enlace del password
+gate implementado.
 
 - Añadir campo honeypot a `/report/`. Implementado.
 - Añadir cooldown por `ShortURL.id` para intentos de password gate.
+  Implementado.
 - Añadir límites por `reported_path` para reportes repetidos.
 - Mantener respuestas genéricas y sin datos de visitante.
 
