@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import make_password
 from django.test import SimpleTestCase
 from django.test import TestCase
 from django.urls import reverse
@@ -253,6 +254,11 @@ class PublicRedirectTests(TestCase):
         self.assertNotContains(response, "desactiv", status_code=404)
         self.assertNotContains(response, "agot", status_code=404)
 
+    def assert_password_gate(self, response):
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Enlace protegido")
+        self.assertContains(response, "Contrasena")
+
     def test_available_anonymous_redirects(self):
         self.create_short_url(slug="anon", destination_url="https://example.com/anon")
 
@@ -334,12 +340,121 @@ class PublicRedirectTests(TestCase):
 
         self.assert_unavailable(response)
 
-    def test_password_protected_link_does_not_redirect_until_gate_exists(self):
-        self.create_short_url(slug="protected", password_hash="fake-hash")
+    def test_password_link_get_shows_form(self):
+        short_url = self.create_short_url(
+            slug="protected",
+            password_hash=make_password("secret"),
+        )
+
+        response = self.client.get("/a/protected/")
+
+        self.assert_password_gate(response)
+        short_url.refresh_from_db()
+        self.assertEqual(short_url.click_count, 0)
+        self.assertFalse(ShortURLDailyStats.objects.filter(short_url=short_url).exists())
+
+    def test_password_link_correct_password_redirects(self):
+        self.create_short_url(
+            slug="protected",
+            password_hash=make_password("secret"),
+            destination_url="https://example.com/protected",
+        )
+
+        response = self.client.post("/a/protected/", {"password": "secret"})
+
+        self.assertRedirects(
+            response,
+            "https://example.com/protected",
+            fetch_redirect_response=False,
+        )
+
+    def test_namespaced_password_link_correct_password_redirects(self):
+        user = self.create_user("private")
+        self.create_short_url(
+            owner=user,
+            slug="protected",
+            public_mode=ShortURL.PublicMode.NAMESPACE,
+            password_hash=make_password("secret"),
+            destination_url="https://example.com/private",
+        )
+
+        response = self.client.post("/private/protected/", {"password": "secret"})
+
+        self.assertRedirects(
+            response,
+            "https://example.com/private",
+            fetch_redirect_response=False,
+        )
+
+    def test_password_link_incorrect_password_does_not_redirect(self):
+        short_url = self.create_short_url(
+            slug="protected",
+            password_hash=make_password("secret"),
+        )
+
+        response = self.client.post("/a/protected/", {"password": "wrong"})
+
+        self.assert_password_gate(response)
+        self.assertContains(response, "No pudimos validar la contrasena.")
+        short_url.refresh_from_db()
+        self.assertEqual(short_url.click_count, 0)
+        self.assertFalse(ShortURLDailyStats.objects.filter(short_url=short_url).exists())
+
+    def test_password_link_correct_password_increments_click_count(self):
+        short_url = self.create_short_url(
+            slug="protected",
+            password_hash=make_password("secret"),
+        )
+
+        response = self.client.post("/a/protected/", {"password": "secret"})
+
+        self.assertEqual(response.status_code, 302)
+        short_url.refresh_from_db()
+        self.assertEqual(short_url.click_count, 1)
+        stats = ShortURLDailyStats.objects.get(
+            short_url=short_url,
+            date=timezone.localdate(),
+        )
+        self.assertEqual(stats.clicks, 1)
+
+    def test_expired_password_link_shows_unavailable_not_form(self):
+        self.create_short_url(
+            slug="protected",
+            password_hash=make_password("secret"),
+            expires_at=timezone.now() - timedelta(days=1),
+        )
 
         response = self.client.get("/a/protected/")
 
         self.assert_unavailable(response)
+        self.assertNotContains(response, "Enlace protegido", status_code=404)
+
+    def test_disabled_password_link_shows_unavailable_not_form(self):
+        self.create_short_url(
+            slug="protected",
+            password_hash=make_password("secret"),
+            is_disabled=True,
+        )
+
+        response = self.client.get("/a/protected/")
+
+        self.assert_unavailable(response)
+        self.assertNotContains(response, "Enlace protegido", status_code=404)
+
+    def test_password_link_max_clicks_one_blocks_second_correct_post(self):
+        short_url = self.create_short_url(
+            slug="protected",
+            password_hash=make_password("secret"),
+            max_clicks=1,
+        )
+
+        first_response = self.client.post("/a/protected/", {"password": "secret"})
+        second_response = self.client.post("/a/protected/", {"password": "secret"})
+
+        self.assertEqual(first_response.status_code, 302)
+        self.assert_unavailable(second_response)
+        short_url.refresh_from_db()
+        self.assertEqual(short_url.click_count, 1)
 
     def test_max_clicks_one_allows_first_access_and_blocks_second(self):
         short_url = self.create_short_url(slug="once", max_clicks=1)

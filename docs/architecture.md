@@ -82,9 +82,9 @@ Campos no editables después de crear:
 - `public_mode`;
 - `owner`.
 
-La contraseña queda guardada como hash en `password_hash`, pero el flujo público
-de acceso con contraseña todavía no está implementado. Hasta que exista ese
-flujo, un enlace con `password_hash` no se redirige públicamente.
+La contraseña queda guardada como hash en `password_hash`. El flujo público
+muestra un formulario de contraseña solo cuando el enlace existe y está
+disponible.
 
 ## Soft delete y disponibilidad
 
@@ -103,8 +103,8 @@ evitar reutilización accidental y preservar auditabilidad.
 - `mark_deleted()`.
 
 `is_available` indica disponibilidad operativa para redirecciones: no eliminada,
-activa, no deshabilitada, sin contraseña pendiente de flujo, no expirada y sin
-límite de clicks agotado.
+activa, no deshabilitada, no expirada y sin límite de clicks agotado. Un enlace
+puede estar disponible y requerir contraseña.
 
 ## Redirecciones públicas y estadísticas
 
@@ -123,13 +123,20 @@ Si el enlace no existe o no está disponible, se devuelve una página genérica
 `links/unavailable.html` con status `404`. La respuesta no indica si el enlace
 existió, expiró, fue deshabilitado, fue ocultado o agotó usos.
 
-Si el enlace está disponible, se registra únicamente:
+Si el enlace está disponible y tiene `password_hash`, se muestra
+`links/password_gate.html`. El formulario soporta GET y POST en las mismas rutas
+públicas `/a/<slug>/` y `/<namespace>/<slug>/`. Una contraseña incorrecta muestra
+un error genérico y no registra estadísticas.
+
+Si el enlace está disponible y no requiere contraseña, o si la contraseña fue
+correcta, se registra únicamente:
 
 - incremento de `ShortURL.click_count`;
 - actualización de `ShortURL.last_clicked_at`;
 - incremento de `ShortURLDailyStats.clicks` para la fecha local actual.
 
-No se guardan IPs, user-agent ni referrer en el modelo de estadísticas.
+No se guardan IPs, user-agent ni referrer en el modelo de estadísticas. Tampoco
+se guardan intentos fallidos del password gate.
 
 ## Registro y perfil
 
@@ -201,7 +208,6 @@ tracking invasivo. Opciones a evaluar:
 ## Decisiones pendientes
 
 - flujo de creación anónima;
-- flujo público para enlaces con contraseña;
 - formulario o proceso de reporte de abuso;
 - política exacta de logs en reverse proxy;
 - borrado lógico frente a reutilización futura de slugs;

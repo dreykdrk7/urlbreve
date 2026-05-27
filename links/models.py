@@ -96,7 +96,6 @@ class ShortURL(models.Model):
             self.deleted_at is None
             and self.is_active
             and not self.is_disabled
-            and not self.password_hash
             and not self.is_expired
             and not self.is_click_limit_reached
         )

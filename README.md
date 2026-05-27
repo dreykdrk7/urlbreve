@@ -92,7 +92,7 @@ creación permite:
 - `public_mode`, con modos `anonymous` y `namespace`;
 - `expires_days`, donde `0` significa que no expira;
 - `max_clicks`, donde `0` significa ilimitado;
-- contraseña opcional, guardada solo como hash y sin flujo público todavía.
+- contraseña opcional, guardada solo como hash.
 
 Después de crear, no se pueden editar `slug`, `public_mode` ni `owner`. Sí se
 pueden editar destino, título, expiración, límite de clicks, estado activo y
@@ -120,21 +120,25 @@ que el enlace:
 - esté activo;
 - no esté deshabilitado por moderación;
 - no esté expirado;
-- no haya agotado `max_clicks`;
-- no tenga contraseña pendiente de flujo público.
+- no haya agotado `max_clicks`.
 
 Si el enlace no existe o no está disponible, se devuelve una página genérica con
 status `404`. La página no revela si el enlace existió, expiró, fue desactivado
 o agotó usos.
 
-Cuando el enlace está disponible, urlbreve redirige a `destination_url` y solo
-actualiza contadores agregados:
+Si el enlace está disponible y tiene contraseña, se muestra un formulario simple
+antes de redirigir. Una contraseña incorrecta no redirige y no incrementa
+estadísticas.
+
+Cuando el enlace redirige finalmente a `destination_url`, urlbreve solo actualiza
+contadores agregados:
 
 - `ShortURL.click_count`;
 - `ShortURL.last_clicked_at`;
 - `ShortURLDailyStats.clicks` para la fecha actual.
 
 No se guardan IPs, user-agent, referrer ni datos de tracking del visitante.
+El password gate tampoco guarda datos del visitante ni registra intentos.
 
 ## Estado
 
@@ -148,8 +152,9 @@ Microfase actual:
 - edición de namespace público y preferencia de modo;
 - creación, listado, detalle, edición limitada y soft delete de URLs propias;
 - redirecciones públicas con contador agregado diario;
+- enlaces protegidos con contraseña;
 - página inicial y endpoint `/healthz/`;
 - documentación y licencia AGPLv3.
 
-No están implementadas todavía la API pública, el flujo de contraseña, reporte
-de abuso ni el rate limiting.
+No están implementadas todavía la API pública, reporte de abuso ni el rate
+limiting.

@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+from django.contrib.auth.hashers import check_password
 from django.db import transaction
 from django.db.models import F, Q
 from django.utils import timezone
@@ -11,6 +13,17 @@ from .validators import RESERVED_SLUGS, validate_safe_slug
 
 
 SLUG_ALPHABET = string.ascii_letters + string.digits
+
+
+@dataclass(frozen=True)
+class VisitResult:
+    status: str
+    destination_url: str | None = None
+
+
+VISIT_REDIRECT = "redirect"
+VISIT_UNAVAILABLE = "unavailable"
+VISIT_INVALID_PASSWORD = "invalid_password"
 
 
 def slug_exists(slug: str, public_mode: str, owner=None) -> bool:
@@ -88,22 +101,29 @@ def record_click(short_url: ShortURL) -> None:
     stats.save(update_fields=["clicks"])
 
 
-def visit_short_url(short_url: ShortURL | None) -> str | None:
+def visit_short_url(short_url: ShortURL | None, password: str | None = None) -> VisitResult:
     if short_url is None or not short_url.is_available:
-        return None
+        return VisitResult(VISIT_UNAVAILABLE)
+
+    if short_url.password_hash and not check_password(password or "", short_url.password_hash):
+        return VisitResult(VISIT_INVALID_PASSWORD)
 
     destination_url = short_url.destination_url
     record_click(short_url)
-    return destination_url
+    return VisitResult(VISIT_REDIRECT, destination_url=destination_url)
 
 
-def visit_anonymous_short_url(slug: str) -> str | None:
+def visit_anonymous_short_url(slug: str, password: str | None = None) -> VisitResult:
     with transaction.atomic():
         short_url = resolve_anonymous_short_url(slug, for_update=True)
-        return visit_short_url(short_url)
+        return visit_short_url(short_url, password=password)
 
 
-def visit_namespaced_short_url(namespace: str, slug: str) -> str | None:
+def visit_namespaced_short_url(
+    namespace: str,
+    slug: str,
+    password: str | None = None,
+) -> VisitResult:
     with transaction.atomic():
         short_url = resolve_namespaced_short_url(namespace, slug, for_update=True)
-        return visit_short_url(short_url)
+        return visit_short_url(short_url, password=password)

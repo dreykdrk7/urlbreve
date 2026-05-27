@@ -152,3 +152,11 @@ class ShortURLEditForm(forms.ModelForm):
         if commit:
             instance.save()
         return instance
+
+
+class PasswordGateForm(forms.Form):
+    password = forms.CharField(
+        label="Contrasena",
+        strip=False,
+        widget=forms.PasswordInput(render_value=False),
+    )

@@ -4,9 +4,16 @@ from django.shortcuts import get_object_or_404, redirect
 from django.http import JsonResponse
 from django.shortcuts import render
 
-from .forms import ShortURLCreateForm, ShortURLEditForm
+from .forms import PasswordGateForm, ShortURLCreateForm, ShortURLEditForm
 from .models import ShortURL
-from .services import visit_anonymous_short_url, visit_namespaced_short_url
+from .services import (
+    VISIT_INVALID_PASSWORD,
+    VISIT_REDIRECT,
+    resolve_anonymous_short_url,
+    resolve_namespaced_short_url,
+    visit_anonymous_short_url,
+    visit_namespaced_short_url,
+)
 
 
 def home(request):
@@ -21,18 +28,55 @@ def unavailable(request):
     return render(request, "links/unavailable.html", status=404)
 
 
-def public_anonymous_redirect(request, slug: str):
-    destination_url = visit_anonymous_short_url(slug)
-    if destination_url is None:
+def render_password_gate(request, form):
+    return render(request, "links/password_gate.html", {"form": form})
+
+
+def handle_public_redirect(request, short_url, visit_func):
+    if short_url is None or not short_url.is_available:
         return unavailable(request)
-    return redirect(destination_url)
+
+    if short_url.password_hash:
+        if request.method == "POST":
+            form = PasswordGateForm(request.POST)
+            if form.is_valid():
+                result = visit_func(password=form.cleaned_data["password"])
+                if result.status == VISIT_REDIRECT:
+                    return redirect(result.destination_url)
+                if result.status == VISIT_INVALID_PASSWORD:
+                    form.add_error("password", "No pudimos validar la contrasena.")
+                    return render_password_gate(request, form)
+                return unavailable(request)
+        else:
+            form = PasswordGateForm()
+        return render_password_gate(request, form)
+
+    result = visit_func()
+    if result.status != VISIT_REDIRECT:
+        return unavailable(request)
+    return redirect(result.destination_url)
+
+
+def public_anonymous_redirect(request, slug: str):
+    short_url = resolve_anonymous_short_url(slug)
+    return handle_public_redirect(
+        request,
+        short_url,
+        lambda password=None: visit_anonymous_short_url(slug, password=password),
+    )
 
 
 def public_namespaced_redirect(request, namespace: str, slug: str):
-    destination_url = visit_namespaced_short_url(namespace, slug)
-    if destination_url is None:
-        return unavailable(request)
-    return redirect(destination_url)
+    short_url = resolve_namespaced_short_url(namespace, slug)
+    return handle_public_redirect(
+        request,
+        short_url,
+        lambda password=None: visit_namespaced_short_url(
+            namespace,
+            slug,
+            password=password,
+        ),
+    )
 
 
 def get_owned_short_url(user, pk: int) -> ShortURL:
