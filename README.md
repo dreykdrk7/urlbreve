@@ -37,9 +37,12 @@ La app queda disponible en `http://localhost:8000/` y el healthcheck básico en
 `http://localhost:8000/healthz/`.
 
 `docker-compose.yml` incluye valores de desarrollo para arrancar rápido. Para
-producción, define variables reales equivalentes a `.env.example` desde el
-entorno del servidor o desde tu gestor de despliegue. Django no carga `.env`
-por sí mismo.
+producción, define variables reales equivalentes a `.env.production.example`
+desde el entorno del servidor o desde tu gestor de despliegue. Django no carga
+`.env` por sí mismo.
+
+Para VPS con Docker Compose, PostgreSQL y nginx, usa la guía
+[`docs/production-deploy.md`](docs/production-deploy.md).
 
 ## Comandos básicos
 

@@ -39,6 +39,11 @@ Las redirecciones públicas no persisten datos del visitante. En producción
 también habrá que revisar configuración de reverse proxy y logs web para
 alinear la infraestructura con esta política.
 
+El despliegue de producción documentado usa nginx con `access_log off` y no
+reenvía `X-Forwarded-For`, `X-Real-IP`, `Forwarded`, `User-Agent` ni `Referer`
+a Django. La aplicación solo necesita `Host` y `X-Forwarded-Proto` para generar
+URLs correctas y operar detrás de TLS.
+
 ## Modos de URL
 
 `ShortURL.public_mode` define dos modos iniciales:
@@ -370,6 +375,9 @@ cache no incluyen IP, user-agent, referrer ni fingerprinting.
 
 Settings actuales:
 
+- `DJANGO_SESSION_COOKIE_SECURE`;
+- `DJANGO_CSRF_COOKIE_SECURE`;
+- `DJANGO_SECURE_SSL_REDIRECT`;
 - `URLBREVE_ANONYMOUS_API_ENABLED`;
 - `URLBREVE_RATE_LIMITING_ENABLED`;
 - `URLBREVE_ANONYMOUS_DAILY_LIMIT`;
@@ -385,6 +393,26 @@ Settings actuales:
 Siguen pendientes Redis o cache compartida para varias instancias, límites por
 `reported_path`, bloqueo futuro de dominios abusivos y protección temporal de
 infraestructura sin access logs persistentes.
+
+## Despliegue de producción
+
+La configuración de producción vive en:
+
+- `.env.production.example`, como plantilla de variables reales;
+- `docker-compose.prod.yml`, con servicios `web`, `db` y `nginx`;
+- `deploy/nginx/urlbreve.conf`, con reverse proxy privacy-first;
+- `docs/production-deploy.md`, con operación paso a paso.
+
+Decisiones:
+
+- solo nginx expone puerto público;
+- PostgreSQL no expone puertos al host;
+- Gunicorn queda detrás de nginx en red interna de Compose;
+- staticfiles se comparten mediante volumen Docker;
+- nginx sirve `/static/`;
+- nginx no escribe access logs;
+- nginx no reenvía IP, user-agent ni referrer de visitante a Django;
+- TLS queda documentado como capa externa o extensión futura del stack.
 
 ## Decisiones pendientes
 
