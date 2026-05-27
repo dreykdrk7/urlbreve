@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: urlbreve
+      POSTGRES_USER: urlbreve
+      POSTGRES_PASSWORD: urlbreve
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U urlbreve -d urlbreve"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    command: >
+      sh -c "python manage.py migrate &&
+             gunicorn config.wsgi:application --bind 0.0.0.0:8000"
+    environment:
+      DJANGO_SECRET_KEY: change-me-in-production
+      DJANGO_DEBUG: "1"
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,0.0.0.0
+      DJANGO_CSRF_TRUSTED_ORIGINS: http://localhost:8000
+      DATABASE_URL: postgres://urlbreve:urlbreve@db:5432/urlbreve
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

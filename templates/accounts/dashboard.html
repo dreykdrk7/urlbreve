@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - urlbreve{% endblock %}
+
+{% block content %}
+  <section class="panel">
+    <h1>Dashboard</h1>
+    <div class="profile-grid">
+      <div class="profile-item">
+        <p class="profile-label">Usuario</p>
+        <p class="profile-value">{{ request.user.username }}</p>
+      </div>
+      <div class="profile-item">
+        <p class="profile-label">Namespace publico</p>
+        <p class="profile-value">{{ profile.public_namespace }}</p>
+      </div>
+      <div class="profile-item">
+        <p class="profile-label">Modo preferido</p>
+        <p class="profile-value">
+          {% if profile.prefer_public_namespace %}Namespace{% else %}Anonimo{% endif %}
+        </p>
+      </div>
+      <div class="profile-item">
+        <p class="profile-label">URLs</p>
+        <p class="profile-value">{{ short_url_count }}</p>
+      </div>
+    </div>
+    <p class="lead">La creacion de URLs llegara en la siguiente fase.</p>
+    <div class="actions">
+      <a class="button" href="{% url 'accounts:profile_edit' %}">Editar perfil</a>
+      <form class="logout-form" method="post" action="{% url 'accounts:logout' %}">
+        {% csrf_token %}
+        <button class="button warning" type="submit">Salir</button>
+      </form>
+    </div>
+  </section>
+{% endblock %}

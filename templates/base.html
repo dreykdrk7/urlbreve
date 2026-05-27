@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}urlbreve{% endblock %}</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f7f4;
+      --ink: #18201b;
+      --muted: #59635c;
+      --line: #d9ddd5;
+      --accent: #166f6b;
+      --accent-ink: #ffffff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.5;
+    }
+
+    .site-shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+    }
+
+    header,
+    main,
+    footer {
+      width: min(960px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    header {
+      padding: 24px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand {
+      font-weight: 700;
+      color: var(--ink);
+      text-decoration: none;
+    }
+
+    nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    nav a,
+    .link-button {
+      color: var(--accent);
+      font: inherit;
+      font-weight: 650;
+      text-decoration: none;
+    }
+
+    .logout-form {
+      margin: 0;
+    }
+
+    .link-button {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    main {
+      padding: 72px 0;
+    }
+
+    h1 {
+      max-width: 760px;
+      margin: 0;
+      font-size: clamp(2rem, 6vw, 4.5rem);
+      line-height: 1.02;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      max-width: 660px;
+      margin: 24px 0 0;
+      color: var(--muted);
+      font-size: 1.15rem;
+    }
+
+    .panel {
+      max-width: 680px;
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+    }
+
+    .panel h1 {
+      font-size: 2rem;
+      line-height: 1.15;
+    }
+
+    .messages {
+      display: grid;
+      gap: 8px;
+      margin: 0 0 24px;
+      padding: 0;
+      list-style: none;
+    }
+
+    .message {
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #eef6f4;
+      color: var(--ink);
+    }
+
+    .form {
+      display: grid;
+      gap: 18px;
+      margin-top: 24px;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    label {
+      font-weight: 650;
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="password"] {
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #ffffff;
+      color: var(--ink);
+      font: inherit;
+    }
+
+    input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent);
+    }
+
+    .checkbox-field {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .field-error,
+    .form-errors {
+      color: #9b2c2c;
+      font-size: 0.95rem;
+    }
+
+    .profile-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-top: 28px;
+    }
+
+    .profile-item {
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    .profile-label {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .profile-value {
+      margin: 4px 0 0;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 32px;
+    }
+
+    .button {
+      display: inline-flex;
+      min-height: 44px;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 16px;
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      background: var(--accent);
+      color: var(--accent-ink);
+      font-weight: 650;
+      text-decoration: none;
+    }
+
+    .button.secondary {
+      background: transparent;
+      color: var(--accent);
+    }
+
+    .button.warning {
+      border-color: var(--line);
+      background: transparent;
+      color: var(--ink);
+    }
+
+    footer {
+      padding: 24px 0;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="site-shell">
+    <header>
+      <a class="brand" href="{% url 'home' %}">urlbreve</a>
+      <nav aria-label="Principal">
+        {% if request.user.is_authenticated %}
+          <a href="{% url 'accounts:dashboard' %}">Dashboard</a>
+          <form class="logout-form" method="post" action="{% url 'accounts:logout' %}">
+            {% csrf_token %}
+            <button class="link-button" type="submit">Salir</button>
+          </form>
+        {% else %}
+          <a href="{% url 'accounts:login' %}">Entrar</a>
+          <a href="{% url 'accounts:register' %}">Registro</a>
+        {% endif %}
+      </nav>
+    </header>
+    <main>
+      {% if messages %}
+        <ul class="messages">
+          {% for message in messages %}
+            <li class="message">{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+    <footer>
+      AGPLv3. Sin trackers, sin perfiles de visitantes.
+    </footer>
+  </div>
+</body>
+</html>

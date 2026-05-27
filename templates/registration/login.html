@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Entrar - urlbreve{% endblock %}
+
+{% block content %}
+  <section class="panel">
+    <h1>Entrar</h1>
+    <form class="form" method="post">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="form-errors">{{ form.non_field_errors }}</div>
+      {% endif %}
+      <input type="hidden" name="next" value="{{ next }}">
+      <div class="field">
+        {{ form.username.label_tag }}
+        {{ form.username }}
+        {% for error in form.username.errors %}
+          <div class="field-error">{{ error }}</div>
+        {% endfor %}
+      </div>
+      <div class="field">
+        {{ form.password.label_tag }}
+        {{ form.password }}
+        {% for error in form.password.errors %}
+          <div class="field-error">{{ error }}</div>
+        {% endfor %}
+      </div>
+      <div class="actions">
+        <button class="button" type="submit">Entrar</button>
+        <a class="button secondary" href="{% url 'accounts:register' %}">Crear cuenta</a>
+      </div>
+    </form>
+  </section>
+{% endblock %}

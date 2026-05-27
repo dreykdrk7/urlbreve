@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Perfil - urlbreve{% endblock %}
+
+{% block content %}
+  <section class="panel">
+    <h1>Perfil</h1>
+    <form class="form" method="post">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="form-errors">{{ form.non_field_errors }}</div>
+      {% endif %}
+      <div class="field">
+        {{ form.public_namespace.label_tag }}
+        {{ form.public_namespace }}
+        {% for error in form.public_namespace.errors %}
+          <div class="field-error">{{ error }}</div>
+        {% endfor %}
+      </div>
+      <div class="checkbox-field">
+        {{ form.prefer_public_namespace }}
+        {{ form.prefer_public_namespace.label_tag }}
+      </div>
+      {% for error in form.prefer_public_namespace.errors %}
+        <div class="field-error">{{ error }}</div>
+      {% endfor %}
+      <div class="actions">
+        <button class="button" type="submit">Guardar</button>
+        <a class="button secondary" href="{% url 'accounts:dashboard' %}">Volver</a>
+      </div>
+    </form>
+  </section>
+{% endblock %}

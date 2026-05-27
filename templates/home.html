@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}urlbreve - acortador privacy-first{% endblock %}
+
+{% block content %}
+  <h1>urlbreve</h1>
+  <p class="lead">
+    Un acortador de URLs open source y privacy-first, construido con Django
+    y pensado para despliegues sencillos en VPS.
+  </p>
+  <div class="actions">
+    {% if request.user.is_authenticated %}
+      <a class="button" href="{% url 'accounts:dashboard' %}">Dashboard</a>
+    {% else %}
+      <a class="button" href="{% url 'accounts:register' %}">Crear cuenta</a>
+      <a class="button secondary" href="{% url 'accounts:login' %}">Entrar</a>
+    {% endif %}
+    <a class="button secondary" href="/healthz/">Estado</a>
+  </div>
+{% endblock %}
