@@ -268,30 +268,46 @@ Existe `links.validators.suggest_slug_variants()` como helper preparado para
 sugerir variantes cuando haya colisión. En la creación autenticada se usa para
 mostrar alternativas cuando un slug manual ya existe.
 
-## Rate limiting pendiente
+## Rate limiting privacy-first
 
-El rate limiting runtime queda fuera de esta microfase. El diseño inicial está
-en `docs/rate-limiting-privacy-first.md` y debe implementarse sin introducir
-tracking invasivo.
+La Fase 1 de rate limiting runtime está implementada sin IP, user-agent,
+referrer, geolocalización ni fingerprinting. El diseño completo vive en
+`docs/rate-limiting-privacy-first.md`.
 
-Capas recomendadas:
+La implementación actual usa Django cache con ventana diaria basada en
+`timezone.localdate()` y claves por entidad:
 
-- límites por usuario autenticado;
-- límites por usuario resuelto desde `X-API-Key`;
-- límites por sesión Django para flujos web públicos;
-- honeypot simple en `/report/`;
-- cooldown por enlace para password gate;
-- cache local o Redis según número de instancias;
-- protección anti-abuse temporal a nivel de infraestructura, sin access logs
-  persistentes.
+- creación web: `request.user.id`;
+- API con `X-API-Key`: usuario resuelto desde la clave;
+- API anónima: sesión Django;
+- reportes: sesión Django;
+- password gate: sesión Django + `ShortURL.id`.
 
-La API anónima debería ser desactivable por setting o tener un límite muy bajo.
-Los buckets HMAC temporales basados en IP quedan documentados como opción
-sensible, opcional y desactivada por defecto.
+El password gate cuenta todos los POST válidos de contraseña, tanto correctos
+como incorrectos. Al superar el límite, no se comprueba la contraseña y no se
+registra click.
+
+La API anónima puede desactivarse con `URLBREVE_ANONYMOUS_API_ENABLED`. Si está
+activa, el límite por sesión no detiene clientes que descartan cookies; por eso
+debe mantenerse bajo en producción.
+
+Settings actuales:
+
+- `URLBREVE_ANONYMOUS_API_ENABLED`;
+- `URLBREVE_RATE_LIMITING_ENABLED`;
+- `URLBREVE_ANONYMOUS_DAILY_LIMIT`;
+- `URLBREVE_AUTHENTICATED_DAILY_LIMIT`;
+- `URLBREVE_API_KEY_DAILY_LIMIT`;
+- `URLBREVE_REPORT_SESSION_DAILY_LIMIT`;
+- `URLBREVE_PASSWORD_GATE_SESSION_LIMIT`.
+
+Siguen pendientes honeypot en `/report/`, cooldown avanzado por enlace, Redis o
+cache compartida para varias instancias y protección temporal de infraestructura
+sin access logs persistentes.
 
 ## Decisiones pendientes
 
 - flujo de creación anónima;
 - política exacta de logs en reverse proxy;
 - borrado lógico frente a reutilización futura de slugs;
-- implementación runtime de límites compatibles con la política privacy-first.
+- siguientes fases de anti-abuse compatibles con la política privacy-first.

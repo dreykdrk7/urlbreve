@@ -162,14 +162,21 @@ disponibilidad de las redirecciones publicas.
 
 ## Rate limiting y anti-abuse
 
-El rate limiting sigue pendiente de implementación. La estrategia de diseño está
-documentada en `docs/rate-limiting-privacy-first.md` y prioriza límites por
-usuario, API key y sesión antes de considerar señales sensibles como IP.
+La Fase 1 de rate limiting privacy-first está implementada con Django cache y
+sin usar IP, user-agent, referrer ni fingerprinting. La estrategia completa está
+documentada en `docs/rate-limiting-privacy-first.md`.
 
-La recomendación inicial es poder desactivar o limitar fuertemente la API
-anónima, aplicar límites fuertes a API keys y usuarios autenticados, añadir
-honeypot en reportes, limitar el password gate por sesión y reservar defensas de
-infraestructura efímeras para ataques activos.
+Límites activos:
+
+- creación anónima por API, basada en sesión Django y desactivable por setting;
+- creación por API key, limitada por usuario resuelto desde `X-API-Key`;
+- creación web autenticada, limitada por `request.user.id`;
+- reportes de abuso, limitados por sesión;
+- password gate, limitado por sesión y enlace.
+
+La protección de API anónima es deliberadamente imperfecta: clientes que no
+conservan cookies pueden esquivar el límite de sesión. En producción se puede
+desactivar la API anónima o mantenerla con límites bajos.
 
 ## API
 
@@ -228,9 +235,9 @@ Microfase actual:
 - API mínima de creación con `X-API-Key`;
 - reporte de abuso sin datos personales del visitante;
 - moderacion basica con `is_disabled`;
-- diseño documentado para rate limiting privacy-first;
+- Fase 1 de rate limiting privacy-first sin IP;
 - página inicial y endpoint `/healthz/`;
 - documentación y licencia AGPLv3.
 
-No están implementados todavía el rate limiting runtime ni la revisión fina de
-logs del VPS/reverse proxy.
+No están implementados todavía honeypot, cooldown avanzado por enlace,
+cache compartida/Redis ni la revisión fina de logs del VPS/reverse proxy.

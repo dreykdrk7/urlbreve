@@ -24,6 +24,16 @@ def env_list(name: str, default: str = "") -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def env_int(name: str, default: int) -> int:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    try:
+        return int(value.strip())
+    except ValueError:
+        return default
+
+
 def database_from_url(url: str) -> dict[str, object]:
     parsed = urlparse(url)
     if parsed.scheme not in {"postgres", "postgresql"}:
@@ -50,6 +60,29 @@ ALLOWED_HOSTS = env_list(
     default="localhost,127.0.0.1,0.0.0.0,testserver",
 )
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
+
+URLBREVE_ANONYMOUS_API_ENABLED = env_bool(
+    "URLBREVE_ANONYMOUS_API_ENABLED",
+    default=True,
+)
+URLBREVE_RATE_LIMITING_ENABLED = env_bool(
+    "URLBREVE_RATE_LIMITING_ENABLED",
+    default=True,
+)
+URLBREVE_ANONYMOUS_DAILY_LIMIT = env_int("URLBREVE_ANONYMOUS_DAILY_LIMIT", 20)
+URLBREVE_AUTHENTICATED_DAILY_LIMIT = env_int(
+    "URLBREVE_AUTHENTICATED_DAILY_LIMIT",
+    100,
+)
+URLBREVE_API_KEY_DAILY_LIMIT = env_int("URLBREVE_API_KEY_DAILY_LIMIT", 200)
+URLBREVE_REPORT_SESSION_DAILY_LIMIT = env_int(
+    "URLBREVE_REPORT_SESSION_DAILY_LIMIT",
+    10,
+)
+URLBREVE_PASSWORD_GATE_SESSION_LIMIT = env_int(
+    "URLBREVE_PASSWORD_GATE_SESSION_LIMIT",
+    5,
+)
 
 
 INSTALLED_APPS = [

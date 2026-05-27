@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.hashers import make_password
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.utils import timezone
@@ -15,6 +16,11 @@ from django.shortcuts import render
 
 from .forms import AbuseReportForm, PasswordGateForm, ShortURLCreateForm, ShortURLEditForm
 from .models import AbuseReport, ShortURL
+from .rate_limits import (
+    consume_password_gate_limit,
+    consume_session_daily_limit,
+    consume_user_daily_limit,
+)
 from .services import (
     VISIT_INVALID_PASSWORD,
     VISIT_REDIRECT,
@@ -95,6 +101,8 @@ def api_shorten(request):
         owner = get_user_for_api_key(api_key)
         if owner is None:
             return json_error("Invalid API key.", status=401)
+    elif not settings.URLBREVE_ANONYMOUS_API_ENABLED:
+        return json_error("Anonymous API creation is disabled.", status=403)
 
     destination_url = clean_string(payload.get("destination_url"))
     if not destination_url:
@@ -116,6 +124,21 @@ def api_shorten(request):
         max_clicks = parse_non_negative_int(payload.get("max_clicks"), "max_clicks")
     except ValueError as exc:
         return json_error(str(exc), status=400)
+
+    if owner is None:
+        limit_result = consume_session_daily_limit(
+            request,
+            "api-anonymous-shorten",
+            settings.URLBREVE_ANONYMOUS_DAILY_LIMIT,
+        )
+    else:
+        limit_result = consume_user_daily_limit(
+            "api-key-shorten",
+            owner.pk,
+            settings.URLBREVE_API_KEY_DAILY_LIMIT,
+        )
+    if not limit_result.allowed:
+        return json_error("Rate limit exceeded.", status=429, limit=limit_result.limit)
 
     slug = clean_string(payload.get("slug"))
     if slug:
@@ -187,16 +210,23 @@ def abuse_report(request):
     if request.method == "POST":
         form = AbuseReportForm(request.POST)
         if form.is_valid():
-            reported_path, short_url = resolve_reported_path(
-                form.cleaned_data["reported_path"],
+            limit_result = consume_session_daily_limit(
+                request,
+                "abuse-report",
+                settings.URLBREVE_REPORT_SESSION_DAILY_LIMIT,
             )
-            AbuseReport.objects.create(
-                short_url=short_url,
-                reported_path=reported_path,
-                reason=form.cleaned_data["reason"],
-                details=form.cleaned_data["details"],
-            )
-            return render(request, "links/report_done.html")
+            if limit_result.allowed:
+                reported_path, short_url = resolve_reported_path(
+                    form.cleaned_data["reported_path"],
+                )
+                AbuseReport.objects.create(
+                    short_url=short_url,
+                    reported_path=reported_path,
+                    reason=form.cleaned_data["reason"],
+                    details=form.cleaned_data["details"],
+                )
+                return render(request, "links/report_done.html")
+            form.add_error(None, "Has alcanzado el limite diario de reportes.")
     else:
         form = AbuseReportForm(
             initial={"reported_path": request.GET.get("path", "")},
@@ -213,6 +243,14 @@ def handle_public_redirect(request, short_url, visit_func):
         if request.method == "POST":
             form = PasswordGateForm(request.POST)
             if form.is_valid():
+                limit_result = consume_password_gate_limit(
+                    request,
+                    short_url.pk,
+                    settings.URLBREVE_PASSWORD_GATE_SESSION_LIMIT,
+                )
+                if not limit_result.allowed:
+                    form.add_error("password", "Demasiados intentos. Intentalo mas tarde.")
+                    return render_password_gate(request, form)
                 result = visit_func(password=form.cleaned_data["password"])
                 if result.status == VISIT_REDIRECT:
                     return redirect(result.destination_url)
@@ -266,9 +304,16 @@ def short_url_create(request):
     if request.method == "POST":
         form = ShortURLCreateForm(request.POST, owner=request.user)
         if form.is_valid():
-            short_url = form.save()
-            messages.success(request, "URL corta creada.")
-            return redirect(short_url)
+            limit_result = consume_user_daily_limit(
+                "web-shorten",
+                request.user.pk,
+                settings.URLBREVE_AUTHENTICATED_DAILY_LIMIT,
+            )
+            if limit_result.allowed:
+                short_url = form.save()
+                messages.success(request, "URL corta creada.")
+                return redirect(short_url)
+            form.add_error(None, "Has alcanzado el limite diario de creacion.")
     else:
         form = ShortURLCreateForm(owner=request.user)
 

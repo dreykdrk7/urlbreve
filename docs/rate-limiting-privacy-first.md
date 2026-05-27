@@ -1,8 +1,8 @@
 # Rate limiting privacy-first
 
-Este documento diseña una estrategia futura de rate limiting y anti-abuse para
-urlbreve sin cambiar el runtime actual. No introduce modelos, migraciones ni
-dependencias.
+Este documento diseña la estrategia de rate limiting y anti-abuse para urlbreve.
+La Fase 1 ya está implementada sin IP, sin fingerprinting, sin modelos nuevos,
+sin migraciones y sin dependencias nuevas.
 
 ## Problema
 
@@ -267,10 +267,41 @@ La primera implementación debería evitar IPs por completo:
 - Reservar protección temporal en memoria a nivel de infraestructura para
   ataques activos, con uso explícito y revisable.
 
-## Settings futuros
+## Fase 1 implementada
 
-Estos settings deberían leerse del entorno, igual que el resto de configuración
-del proyecto:
+La Fase 1 usa Django cache con ventana diaria y `timezone.localdate()`. Las
+claves de cache no contienen IP, user-agent, referrer ni API keys en claro.
+
+Límites activos:
+
+- `POST /api/shorten/` anónimo: por sesión Django. Si
+  `URLBREVE_ANONYMOUS_API_ENABLED=False`, devuelve `403`.
+- `POST /api/shorten/` con `X-API-Key`: por usuario resuelto desde la API key.
+- `/links/new/`: por usuario autenticado.
+- `/report/`: por sesión Django.
+- Password gate: por sesión Django y `ShortURL.id`.
+
+Cuando se supera un límite, la API devuelve `429` JSON. Los formularios web
+muestran error de formulario y no crean registros ni redirigen.
+
+El password gate cuenta todos los POST válidos de contraseña, correctos o
+incorrectos. Esta decisión reduce fuerza bruta sin revelar si una contraseña era
+válida. Si se supera el límite, no se comprueba la contraseña, no se redirige y
+no se incrementan estadísticas.
+
+Limitaciones:
+
+- La API anónima se limita por sesión/cookie. Clientes que descartan cookies
+  pueden evadir este límite.
+- El cache local solo coordina límites dentro de una instancia. Varias
+  instancias necesitarán cache compartida.
+- No hay honeypot todavía.
+- No hay defensa de infraestructura automatizada todavía.
+
+## Settings
+
+Estos settings se leen del entorno, igual que el resto de configuración del
+proyecto:
 
 - `URLBREVE_ANONYMOUS_API_ENABLED`: activa o desactiva creación anónima por API.
 - `URLBREVE_RATE_LIMITING_ENABLED`: interruptor general de rate limiting.
@@ -279,11 +310,17 @@ del proyecto:
 - `URLBREVE_AUTHENTICATED_DAILY_LIMIT`: límite diario para creación web de
   usuarios autenticados.
 - `URLBREVE_API_KEY_DAILY_LIMIT`: límite diario para creación por API key.
-- `URLBREVE_REPORT_HONEYPOT_ENABLED`: activa honeypot en formularios públicos.
+- `URLBREVE_REPORT_SESSION_DAILY_LIMIT`: límite diario de reportes por sesión.
 - `URLBREVE_PASSWORD_GATE_SESSION_LIMIT`: intentos por sesión antes de cooldown.
-- `URLBREVE_PRIVACY_PRESERVING_IP_BUCKETS_ENABLED`: activa buckets HMAC
-  temporales basados en IP. Debe considerarse opcional, sensible y desactivado
-  por defecto.
+
+Los límites numéricos `<= 0` se tratan como ilimitados para esa capa concreta.
+
+Settings propuestos para fases posteriores:
+
+- `URLBREVE_REPORT_HONEYPOT_ENABLED`: activa honeypot en formularios públicos.
+- `URLBREVE_PRIVACY_PRESERVING_IP_BUCKETS_ENABLED`: activaría buckets HMAC
+  temporales basados en IP. Sigue siendo opcional, sensible y desactivado por
+  defecto.
 
 Valores iniciales sugeridos para producción pequeña:
 
@@ -297,12 +334,14 @@ Valores iniciales sugeridos para producción pequeña:
 
 ### Fase 1: límites sin IP
 
-- Añadir settings.
-- Implementar contadores en cache por usuario autenticado.
-- Implementar contadores en cache por usuario resuelto desde API key.
-- Implementar contadores por sesión para `/report/` y password gate.
-- Responder con `429 Too Many Requests` cuando corresponda.
-- Añadir tests de límites y bypasses esperados.
+Estado: implementada.
+
+- Settings añadidos.
+- Contadores en cache por usuario autenticado.
+- Contadores en cache por usuario resuelto desde API key.
+- Contadores por sesión para `/report/` y password gate.
+- `429 Too Many Requests` para API cuando corresponde.
+- Tests de límites y bypass con `URLBREVE_RATE_LIMITING_ENABLED=False`.
 
 ### Fase 2: honeypot y cooldown por enlace
 

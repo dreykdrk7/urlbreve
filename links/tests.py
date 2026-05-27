@@ -1,8 +1,8 @@
-from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
-from django.test import SimpleTestCase
-from django.test import TestCase
+from django.core.cache import cache
+from django.core.exceptions import ValidationError
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from datetime import timedelta
@@ -709,6 +709,181 @@ class ShortenAPITests(TestCase):
         )
 
         self.assertEqual(response.status_code, 401)
+
+
+class RateLimitTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
+    def create_user(self, username: str):
+        user = User.objects.create_user(username=username, password="StrongPass123")
+        UserProfile.objects.create(user=user, public_namespace=username)
+        return user
+
+    def create_user_with_api_key(self, username: str = "apiuser"):
+        raw_key = f"ub_test_{username}"
+        user = User.objects.create_user(username=username, password="StrongPass123")
+        UserProfile.objects.create(
+            user=user,
+            public_namespace=username,
+            api_key_hash=hash_api_key(raw_key),
+        )
+        return user, raw_key
+
+    def post_json(self, payload, api_key: str | None = None):
+        headers = {}
+        if api_key:
+            headers["HTTP_X_API_KEY"] = api_key
+        return self.client.post(
+            reverse("api_shorten"),
+            data=json.dumps(payload),
+            content_type="application/json",
+            **headers,
+        )
+
+    def post_create(self, **overrides):
+        data = {
+            "destination_url": "https://example.com/page",
+            "slug": "rl1",
+            "title": "Rate limited",
+            "public_mode": ShortURL.PublicMode.ANONYMOUS,
+            "expires_days": "0",
+            "max_clicks": "0",
+            "password": "",
+        }
+        data.update(overrides)
+        return self.client.post(reverse("links:create"), data)
+
+    @override_settings(URLBREVE_ANONYMOUS_API_ENABLED=False)
+    def test_anonymous_api_can_be_disabled(self):
+        response = self.post_json({"destination_url": "https://example.com/api"})
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(ShortURL.objects.count(), 0)
+
+    @override_settings(URLBREVE_ANONYMOUS_DAILY_LIMIT=1)
+    def test_anonymous_api_over_limit_returns_429(self):
+        first = self.post_json(
+            {
+                "destination_url": "https://example.com/one",
+                "slug": "anonrl1",
+            }
+        )
+        second = self.post_json(
+            {
+                "destination_url": "https://example.com/two",
+                "slug": "anonrl2",
+            }
+        )
+
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(second.status_code, 429)
+        self.assertEqual(ShortURL.objects.count(), 1)
+
+    @override_settings(URLBREVE_API_KEY_DAILY_LIMIT=1)
+    def test_api_key_over_limit_returns_429(self):
+        user, raw_key = self.create_user_with_api_key("ratelimited")
+
+        first = self.post_json(
+            {
+                "destination_url": "https://example.com/one",
+                "slug": "keyrl1",
+            },
+            api_key=raw_key,
+        )
+        second = self.post_json(
+            {
+                "destination_url": "https://example.com/two",
+                "slug": "keyrl2",
+            },
+            api_key=raw_key,
+        )
+
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(second.status_code, 429)
+        self.assertEqual(ShortURL.objects.filter(owner=user).count(), 1)
+
+    @override_settings(URLBREVE_AUTHENTICATED_DAILY_LIMIT=1)
+    def test_authenticated_web_creation_over_limit_does_not_create_url(self):
+        user = self.create_user("webuser")
+        self.client.login(username="webuser", password="StrongPass123")
+
+        first = self.post_create(slug="webrl1")
+        second = self.post_create(slug="webrl2")
+
+        self.assertEqual(first.status_code, 302)
+        self.assertEqual(second.status_code, 200)
+        self.assertContains(second, "Has alcanzado el limite diario de creacion.")
+        self.assertEqual(ShortURL.objects.filter(owner=user).count(), 1)
+
+    @override_settings(URLBREVE_REPORT_SESSION_DAILY_LIMIT=1)
+    def test_report_over_limit_does_not_create_abuse_report(self):
+        data = {
+            "reported_path": "/a/demo/",
+            "reason": AbuseReport.Reason.PHISHING,
+            "details": "",
+        }
+
+        first = self.client.post(reverse("abuse_report"), data)
+        second = self.client.post(reverse("abuse_report"), data)
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertContains(second, "Has alcanzado el limite diario de reportes.")
+        self.assertEqual(AbuseReport.objects.count(), 1)
+
+    @override_settings(URLBREVE_PASSWORD_GATE_SESSION_LIMIT=1)
+    def test_password_gate_over_limit_does_not_redirect_even_with_correct_password(self):
+        user = self.create_user("protected")
+        short_url = ShortURL.objects.create(
+            owner=user,
+            destination_url="https://example.com/secret",
+            slug="secret",
+            public_mode=ShortURL.PublicMode.ANONYMOUS,
+            password_hash=make_password("secret"),
+        )
+
+        first = self.client.post("/a/secret/", {"password": "wrong"})
+        second = self.client.post("/a/secret/", {"password": "secret"})
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertContains(second, "Demasiados intentos. Intentalo mas tarde.")
+        short_url.refresh_from_db()
+        self.assertEqual(short_url.click_count, 0)
+        self.assertFalse(ShortURLDailyStats.objects.filter(short_url=short_url).exists())
+
+    @override_settings(
+        URLBREVE_RATE_LIMITING_ENABLED=False,
+        URLBREVE_ANONYMOUS_DAILY_LIMIT=1,
+    )
+    def test_rate_limiting_disabled_bypasses_runtime_limits(self):
+        first = self.post_json(
+            {
+                "destination_url": "https://example.com/one",
+                "slug": "offrl1",
+            }
+        )
+        second = self.post_json(
+            {
+                "destination_url": "https://example.com/two",
+                "slug": "offrl2",
+            }
+        )
+
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(second.status_code, 201)
+        self.assertEqual(ShortURL.objects.count(), 2)
+
+    def test_rate_limiting_does_not_add_visitor_data_fields(self):
+        abuse_fields = {field.name for field in AbuseReport._meta.fields}
+        stats_fields = {field.name for field in ShortURLDailyStats._meta.fields}
+
+        self.assertFalse({"ip", "ip_address", "user_agent", "referrer"} & abuse_fields)
+        self.assertFalse({"ip", "ip_address", "user_agent", "referrer"} & stats_fields)
 
     def test_get_method_returns_method_not_allowed(self):
         response = self.client.get(reverse("api_shorten"))
