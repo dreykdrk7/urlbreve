@@ -12,9 +12,15 @@
   <meta property="og:title" content="{% block og_title %}urlbreve - acortador privacy-first para desarrolladores{% endblock %}">
   <meta property="og:description" content="{% block og_description %}Acorta enlaces con una API sencilla, sin analytics invasivos, sin perfiles de visitantes y con código abierto auditable.{% endblock %}">
   <meta property="og:url" content="{% block og_url %}https://urlbreve.es{{ request.path }}{% endblock %}">
-  <meta name="twitter:card" content="{% block twitter_card %}summary{% endblock %}">
+  <meta property="og:image" content="{% block og_image %}https://urlbreve.es/static/brand/logo.png{% endblock %}">
+  <meta property="og:image:width" content="{% block og_image_width %}689{% endblock %}">
+  <meta property="og:image:height" content="{% block og_image_height %}362{% endblock %}">
+  <meta property="og:image:alt" content="{% block og_image_alt %}urlbreve - acortador privacy-first para desarrolladores{% endblock %}">
+  <meta name="twitter:card" content="{% block twitter_card %}summary_large_image{% endblock %}">
   <meta name="twitter:title" content="{% block twitter_title %}urlbreve - acortador privacy-first para desarrolladores{% endblock %}">
   <meta name="twitter:description" content="{% block twitter_description %}Acorta enlaces con una API sencilla, sin analytics invasivos, sin perfiles de visitantes y con código abierto auditable.{% endblock %}">
+  <meta name="twitter:image" content="{% block twitter_image %}https://urlbreve.es/static/brand/logo.png{% endblock %}">
+  <meta name="twitter:image:alt" content="{% block twitter_image_alt %}urlbreve - acortador privacy-first para desarrolladores{% endblock %}">
   <style>
     :root {
       color-scheme: light;
