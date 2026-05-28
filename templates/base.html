@@ -1,4 +1,4 @@
-<!doctype html>
+{% load static %}<!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
@@ -103,13 +103,28 @@
       text-decoration: none;
     }
 
-    .brand::before {
-      width: 11px;
-      height: 11px;
-      border-radius: 999px;
-      background: var(--accent);
-      box-shadow: 0 0 0 5px rgba(17, 120, 111, 0.12);
-      content: "";
+    .brand-mark {
+      display: inline-flex;
+      width: 34px;
+      height: 34px;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      border: 1px solid rgba(17, 120, 111, 0.18);
+      border-radius: 8px;
+      background: rgba(255, 253, 248, 0.86);
+      box-shadow: 0 8px 22px rgba(30, 45, 38, 0.08);
+    }
+
+    .brand-logo {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .brand-text {
+      line-height: 1;
     }
 
     nav {
@@ -278,6 +293,51 @@
 
     .home-intro {
       padding: 14px 0;
+    }
+
+    .hero-brand-card {
+      display: flex;
+      gap: 13px;
+      max-width: 470px;
+      margin-top: 22px;
+      padding: 11px 13px;
+      align-items: center;
+      border: 1px solid rgba(17, 120, 111, 0.16);
+      border-radius: 8px;
+      background: rgba(255, 253, 248, 0.70);
+      box-shadow: 0 14px 34px rgba(30, 45, 38, 0.07);
+    }
+
+    .hero-brand-card img {
+      display: block;
+      width: 104px;
+      height: auto;
+      max-height: 56px;
+      object-fit: contain;
+      flex: 0 0 auto;
+      border-radius: 6px;
+    }
+
+    .hero-brand-copy {
+      min-width: 0;
+    }
+
+    .hero-brand-copy strong,
+    .hero-brand-copy span {
+      display: block;
+    }
+
+    .hero-brand-copy strong {
+      color: var(--ink);
+      font-size: 0.96rem;
+      line-height: 1.2;
+    }
+
+    .hero-brand-copy span {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.35;
     }
 
     .privacy-points {
@@ -789,6 +849,19 @@
         grid-template-columns: 1fr;
       }
 
+      .brand-mark {
+        width: 31px;
+        height: 31px;
+      }
+
+      .hero-brand-card {
+        max-width: none;
+      }
+
+      .hero-brand-card img {
+        width: 88px;
+      }
+
       .trust-strip {
         grid-template-columns: 1fr;
       }
@@ -821,7 +894,12 @@
 <body>
   <div class="site-shell">
     <header>
-      <a class="brand" href="{% url 'home' %}">urlbreve</a>
+      <a class="brand" href="{% url 'home' %}">
+        <span class="brand-mark">
+          <img class="brand-logo" src="{% static 'brand/logo.png' %}" alt="urlbreve" width="689" height="362">
+        </span>
+        <span class="brand-text">urlbreve</span>
+      </a>
       <nav aria-label="Principal">
         {% if request.user.is_authenticated %}
           <a href="{% url 'accounts:dashboard' %}">Dashboard</a>

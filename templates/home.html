@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}urlbreve - acortador privacy-first para desarrolladores{% endblock %}
 
@@ -12,6 +13,13 @@
         visitantes. Código abierto, Django puro y API sencilla para herramientas
         web que necesitan enlaces cortos sin ruido.
       </p>
+      <div class="hero-brand-card">
+        <img src="{% static 'brand/logo.png' %}" alt="urlbreve" width="689" height="362">
+        <div class="hero-brand-copy">
+          <strong>Marca ligera, código auditable</strong>
+          <span>Enlaces cortos para flujos web sin perfiles de visitantes.</span>
+        </div>
+      </div>
       <ul class="privacy-points">
         <li>Enlaces anónimos con ruta pública /a/&lt;slug&gt;/.</li>
         <li>No guardamos IP, user-agent, referrer ni geolocalización.</li>
