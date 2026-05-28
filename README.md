@@ -49,10 +49,11 @@ Para VPS con Docker Compose, PostgreSQL y nginx, usa la guía
 La operación actual de `urlbreve.es` está documentada en:
 
 - [`docs/production-runbook.md`](docs/production-runbook.md) - arquitectura,
-  comandos de operación, Caddy/staticfiles, rollback y checklist post-deploy.
+  comandos de operación, Caddy/staticfiles, protección de `/admin/`, rollback y
+  checklist post-deploy.
 - [`docs/backups.md`](docs/backups.md) - backups y restore básico de
   PostgreSQL.
-- [`docs/production-closeout.md`](docs/production-closeout.md) - estado v1,
+- [`docs/production-closeout.md`](docs/production-closeout.md) - estado v1.1,
   decisiones y pendientes recomendados.
 
 ## Comandos básicos

@@ -1,9 +1,9 @@
-# Cierre operativo v1
+# Cierre operativo v1.1
 
-Este documento resume el estado de producción de urlbreve v1 y deja pendientes
-operativos recomendados para la siguiente ventana de mantenimiento.
+Este documento resume el estado de producción de urlbreve v1.1 y deja
+pendientes operativos recomendados para futuras ventanas de mantenimiento.
 
-## Estado actual de v1
+## Estado actual de v1.1
 
 - Producción activa en `https://urlbreve.es`.
 - Dominio principal y `www` apuntando por DNS en INWX a `51.38.225.243`.
@@ -13,16 +13,29 @@ operativos recomendados para la siguiente ventana de mantenimiento.
 - Proxy Caddy en Docker en `/opt/apps/shared/proxy`.
 - Caddy termina HTTPS y reenvía a `urlbreve-web:8000`.
 - Caddy sirve `/static/*` desde el volumen `urlbreve_staticfiles`.
+- Home developer-oriented desplegada, con sección API-first visible.
+- `/admin/` protegido por Caddy Basic Auth antes del login normal de Django
+  admin. Usuario Basic Auth: `adminwall`; la contraseña se guarda fuera del
+  repo.
+- `/api/shorten/` no está protegido por Basic Auth y sigue disponible para la
+  API pública.
 - Docker project name de la app: `urlbreve`.
 - Compose de producción con `docker-compose.prod.yml`,
   `docker-compose.vps.yml` y `.env.production` no versionado en el VPS.
+- `DJANGO_SECRET_KEY`, `POSTGRES_PASSWORD` y `DATABASE_URL` rotados tras la
+  exposición accidental durante el despliegue.
 
 Funcionalidad validada:
 
+- Home developer-oriented OK.
+- Sección API-first visible en la home.
 - Creación de URL OK.
 - Redirección pública OK.
-- Admin de Django OK.
+- `/admin/` devuelve `401` sin Basic Auth y conserva el login normal de Django
+  detrás.
 - Estáticos del admin OK.
+- `/api/shorten/` accesible sin Basic Auth.
+- `/healthz/` devuelve `{"status": "ok"}`.
 - `python3 manage.py check` OK.
 
 ## Validaciones realizadas
@@ -33,7 +46,10 @@ Funcionalidad validada:
 - Estáticos servidos por Caddy desde el volumen compartido.
 - App Django operativa con PostgreSQL.
 - Healthcheck de Django OK.
-- Admin accesible por HTTPS.
+- `/admin/` protegido por Basic Auth de Caddy.
+- `/static/admin/css/base.css` público para cargar estilos/assets del admin.
+- `/api/shorten/` no protegido por Basic Auth.
+- Secretos de producción rotados sin documentar valores.
 
 ## Decisiones tomadas
 
@@ -45,36 +61,42 @@ Funcionalidad validada:
   sirva estáticos en producción.
 - Mantener el enfoque privacy-first: no introducir analytics, trackers, fuentes
   externas ni scripts externos.
+- Posicionar la home como landing para desarrolladores web con ejemplo real de
+  API request/response.
+- Añadir Caddy Basic Auth a `/admin/` como defensa adicional sin tocar Django.
+- Rotar secretos expuestos y actualizar `DATABASE_URL` en producción.
 - No tocar `dgt-scraper` durante la puesta en producción de urlbreve.
+
+## Evidencias operativas
+
+- Backup previo a rotación de secretos:
+  `/opt/apps/shared/backups/urlbreve/urlbreve-20260528T085147Z-pre-secret-rotation.sql`.
+- Backup de Caddyfile previo a Basic Auth:
+  `/opt/apps/shared/proxy/Caddyfile.backup-20260528T090031Z`.
+- No se documentan contraseñas, hashes ni valores de `.env.production`.
 
 ## Pendientes recomendados
 
-1. Rotar `DJANGO_SECRET_KEY` y `POSTGRES_PASSWORD`.
-
-   Durante el despliegue se mostraron accidentalmente en salida de Compose.
-   Aunque no deben quedar en el repo, conviene tratarlos como expuestos y
-   rotarlos en una ventana controlada.
-
-2. Configurar backup automatizado.
+1. Configurar backup automatizado.
 
    Crear backups periódicos de PostgreSQL, copiarlos fuera del VPS, cifrarlos y
    probar restauraciones. Ver [`backups.md`](backups.md).
 
-3. Valorar protección adicional de `/admin/`.
-
-   Opciones posibles: allowlist de IP si encaja con operación, ruta interna por
-   VPN, autenticación adicional a nivel de proxy o rate limiting específico que
-   no contradiga la política privacy-first.
-
-4. Planificar una ventana para `apt upgrade`.
+2. Planificar una ventana para `apt upgrade`.
 
    Revisar especialmente Docker, containerd y systemd. Hacerlo con backup
    reciente y comprobación posterior de contenedores, Caddy y app.
 
-5. Añadir monitorización básica.
+3. Añadir monitorización básica.
 
    Como mínimo, alertas de disponibilidad de `/healthz/`, uso de disco,
    expiración TLS, estado de contenedores y espacio de backups.
+
+## Cierre
+
+El proyecto queda cerrado en estado v1.1 hasta futura necesidad funcional,
+operativa o de seguridad. El runbook de producción es la referencia para
+operación diaria e incidencias.
 
 ## Referencias operativas
 

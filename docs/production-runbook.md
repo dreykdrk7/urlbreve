@@ -31,6 +31,7 @@ Visitante
 - App en VPS: `/opt/apps/urlbreve/app`.
 - Proxy compartido: `/opt/apps/shared/proxy`.
 - Archivo de entorno de producción: `/opt/apps/urlbreve/app/.env.production`.
+- Caddyfile del proxy: `/opt/apps/shared/proxy/Caddyfile`.
 - Backups sugeridos: `/opt/apps/shared/backups/urlbreve`.
 - Compose de la app:
   - `docker-compose.prod.yml`
@@ -116,6 +117,22 @@ Comprobación pública:
 curl -fsS https://urlbreve.es/healthz/
 ```
 
+Comprobaciones públicas de borde HTTPS:
+
+```bash
+curl -I https://urlbreve.es
+curl -I https://urlbreve.es/static/admin/css/base.css
+curl -I https://urlbreve.es/admin/
+```
+
+Resultados esperados:
+
+- `https://urlbreve.es` devuelve `200`.
+- `https://urlbreve.es/static/admin/css/base.css` devuelve `200`.
+- `https://urlbreve.es/admin/` sin credenciales devuelve `401` por Basic Auth
+  de Caddy.
+- `curl -fsS https://urlbreve.es/healthz/` devuelve `{"status": "ok"}`.
+
 Comprobación desde el contenedor web:
 
 ```bash
@@ -133,10 +150,14 @@ Puntos funcionales mínimos tras deploy:
 
 - `/healthz/` responde OK por HTTPS.
 - Home carga por `https://urlbreve.es/`.
+- La sección API-first de la home está visible.
 - Creación de URL funciona.
 - Redirección pública funciona.
-- `/admin/` carga por HTTPS.
+- `/admin/` queda protegido por Caddy Basic Auth antes del login normal de
+  Django admin.
 - Estáticos del admin cargan correctamente.
+- `/api/shorten/` no queda protegido por Basic Auth y sigue disponible para la
+  API pública.
 
 ## Migraciones y collectstatic
 
@@ -163,14 +184,29 @@ docker compose --project-name urlbreve --env-file .env.production -f docker-comp
 
 ## Caddy y staticfiles
 
-Caddy vive en `/opt/apps/shared/proxy` y está separado del stack de la app.
-Termina TLS para `urlbreve.es` y `www.urlbreve.es`, y reenvía tráfico dinámico a
+Caddy vive en `/opt/apps/shared/proxy` y su configuración está en
+`/opt/apps/shared/proxy/Caddyfile`. Está separado del stack de la app. Termina
+TLS para `urlbreve.es` y `www.urlbreve.es`, y reenvía tráfico dinámico a
 `urlbreve-web:8000`.
 
 Los estáticos se publican mediante el volumen Docker `urlbreve_staticfiles`.
 Django escribe ahí con `collectstatic`, y Caddy monta el mismo volumen para
 servir `/static/*` directamente. Por eso, después de cambios en CSS, admin o
 assets estáticos, ejecuta `collectstatic` antes de validar visualmente.
+
+`/admin/` tiene una capa adicional de Caddy Basic Auth antes del login normal de
+Django admin. El usuario configurado es `adminwall`; la contraseña no debe
+guardarse en el repo, documentación, issues ni chats. El backup del Caddyfile
+previo a esta protección quedó en
+`/opt/apps/shared/proxy/Caddyfile.backup-20260528T090031Z`.
+
+Mantén estas reglas al tocar Caddy:
+
+- `/static/*`, incluyendo `/static/admin/*`, debe seguir público para cargar
+  CSS y assets del admin.
+- `/api/shorten/` no debe quedar protegido por Basic Auth.
+- El reverse proxy general hacia `urlbreve-web:8000` debe mantenerse.
+- La credencial de Basic Auth no debe guardarse en texto plano.
 
 No activar logs de acceso con IP, user-agent o referrer salvo necesidad
 temporal, documentada y acotada. La política del proyecto es privacy-first.
@@ -204,7 +240,10 @@ Tras estabilizar, vuelve a dejar el repo en una rama o commit conocido.
 - `python manage.py check` OK dentro de `web`.
 - `/healthz/` OK en HTTPS.
 - Home, creación de URL y redirección OK.
-- `/admin/` OK y estáticos del admin OK.
+- `/admin/` devuelve `401` sin Basic Auth y llega al login Django con
+  credenciales válidas.
+- `/static/admin/css/base.css` devuelve `200`.
+- `/api/shorten/` no está protegido por Basic Auth.
 - Logs recientes sin errores nuevos.
 - `.env.production` sigue con permisos restrictivos y no se ha mostrado en
   salidas compartidas.
