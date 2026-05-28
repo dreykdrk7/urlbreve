@@ -11,13 +11,13 @@
         <p class="profile-value">{{ request.user.username }}</p>
       </div>
       <div class="profile-item">
-        <p class="profile-label">Namespace publico</p>
+        <p class="profile-label">Namespace público</p>
         <p class="profile-value">{{ profile.public_namespace }}</p>
       </div>
       <div class="profile-item">
         <p class="profile-label">Modo preferido</p>
         <p class="profile-value">
-          {% if profile.prefer_public_namespace %}Namespace{% else %}Anonimo{% endif %}
+          {% if profile.prefer_public_namespace %}Namespace{% else %}Anónimo{% endif %}
         </p>
       </div>
       <div class="profile-item">
@@ -44,7 +44,7 @@
             <th>Destino</th>
             <th>Clicks</th>
             <th>Expira</th>
-            <th>Limite</th>
+            <th>Límite</th>
             <th>Estado</th>
             <th>Acciones</th>
           </tr>
@@ -82,6 +82,6 @@
       </table>
     </div>
   {% else %}
-    <div class="empty-state">Todavia no hay URLs creadas.</div>
+    <div class="empty-state">Todavía no hay URLs creadas.</div>
   {% endif %}
 {% endblock %}

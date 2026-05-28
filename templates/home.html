@@ -5,16 +5,32 @@
 {% block content %}
   <div class="home-grid">
     <section>
+      <p class="eyebrow">Acortador privacy-first</p>
       <h1>urlbreve</h1>
       <p class="lead">
         Acorta enlaces sin trackers, sin analytics invasivos y sin perfiles de
-        visitantes. Open source, Django puro y preparado para VPS.
+        visitantes. Código abierto, Django puro y pensado para una web pequeña,
+        seria y auditable.
       </p>
       <ul class="privacy-points">
-        <li>Enlaces anonimos con ruta publica /a/&lt;slug&gt;/.</li>
-        <li>No guardamos IP, user-agent, referrer ni geolocalizacion.</li>
-        <li>Codigo auditable y licencia AGPLv3.</li>
+        <li>Enlaces anónimos con ruta pública /a/&lt;slug&gt;/.</li>
+        <li>No guardamos IP, user-agent, referrer ni geolocalización.</li>
+        <li>Código auditable y licencia AGPLv3.</li>
       </ul>
+      <div class="trust-strip" aria-label="Transparencia y privacidad">
+        <div class="trust-item">
+          <strong>Código abierto</strong>
+          <span>El proyecto se puede revisar en GitHub.</span>
+        </div>
+        <div class="trust-item">
+          <strong>Sin analytics</strong>
+          <span>No hay scripts externos de medición.</span>
+        </div>
+        <div class="trust-item">
+          <strong>Sin perfiles</strong>
+          <span>No se crean perfiles de visitantes.</span>
+        </div>
+      </div>
       <div class="actions">
         {% if request.user.is_authenticated %}
           <a class="button secondary" href="{% url 'accounts:dashboard' %}">Dashboard</a>
@@ -26,9 +42,9 @@
     </section>
 
     <section class="panel" aria-labelledby="quick-shortener-title">
-      <h1 id="quick-shortener-title">Crear enlace anonimo</h1>
+      <h1 id="quick-shortener-title">Crear enlace anónimo</h1>
       <p class="lead">
-        No tendras panel ni recuperacion posterior para este enlace.
+        No tendrás panel ni recuperación posterior para este enlace.
       </p>
 
       {% if created_short_url %}
@@ -37,16 +53,16 @@
           <button class="button" type="button" data-copy="{{ created_public_url }}">Copiar</button>
           <dl class="meta-list">
             <div>
-              <dt>Expiracion</dt>
+              <dt>Expiración</dt>
               <dd>{% if created_short_url.expires_at %}{{ created_short_url.expires_at }}{% else %}Nunca{% endif %}</dd>
             </div>
             <div>
-              <dt>Limite de clicks</dt>
+              <dt>Límite de clics</dt>
               <dd>{% if created_short_url.max_clicks %}{{ created_short_url.max_clicks }}{% else %}Ilimitado{% endif %}</dd>
             </div>
             <div>
-              <dt>Protegido con contrasena</dt>
-              <dd>{% if created_short_url.password_hash %}Si{% else %}No{% endif %}</dd>
+              <dt>Protegido con contraseña</dt>
+              <dd>{% if created_short_url.password_hash %}Sí{% else %}No{% endif %}</dd>
             </div>
           </dl>
         </div>
@@ -69,7 +85,7 @@
         <div class="field">
           {{ form.slug.label_tag }}
           {{ form.slug }}
-          <div class="help-text">Opcional. Si lo dejas vacio, generamos uno.</div>
+          <div class="help-text">Opcional. Si lo dejas vacío, generamos uno.</div>
           {% for error in form.slug.errors %}
             <div class="field-error">{{ error }}</div>
           {% endfor %}
