@@ -44,6 +44,17 @@ desde el entorno del servidor o desde tu gestor de despliegue. Django no carga
 Para VPS con Docker Compose, PostgreSQL y nginx, usa la guía
 [`docs/production-deploy.md`](docs/production-deploy.md).
 
+## Production notes
+
+La operación actual de `urlbreve.es` está documentada en:
+
+- [`docs/production-runbook.md`](docs/production-runbook.md) - arquitectura,
+  comandos de operación, Caddy/staticfiles, rollback y checklist post-deploy.
+- [`docs/backups.md`](docs/backups.md) - backups y restore básico de
+  PostgreSQL.
+- [`docs/production-closeout.md`](docs/production-closeout.md) - estado v1,
+  decisiones y pendientes recomendados.
+
 ## Comandos básicos
 
 ```bash
