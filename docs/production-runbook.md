@@ -39,6 +39,10 @@ Visitante
 `.env.production` no está versionado y no debe copiarse al repo ni mostrarse en
 salidas compartidas.
 
+No compartas salidas completas de `docker compose config --env-file
+.env.production`: pueden expandir secretos como `DJANGO_SECRET_KEY`,
+`POSTGRES_PASSWORD` o `DATABASE_URL`.
+
 ## Servicios Docker
 
 Contenedores conocidos:
@@ -79,8 +83,10 @@ docker compose --project-name urlbreve --env-file .env.production -f docker-comp
 docker compose --project-name urlbreve --env-file .env.production -f docker-compose.prod.yml -f docker-compose.vps.yml exec -T web python manage.py check
 ```
 
-Antes de cambios con migraciones o riesgo operativo, toma un backup manual de
-PostgreSQL. Ver [`backups.md`](backups.md).
+Antes de cualquier deploy con migraciones o cambios de datos, haz primero un
+backup manual de PostgreSQL siguiendo [`backups.md`](backups.md). No continúes
+con la actualización hasta saber dónde queda guardado el backup y cómo
+restaurarlo si hiciera falta.
 
 ## Logs
 
