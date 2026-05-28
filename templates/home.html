@@ -9,8 +9,8 @@
       <h1>urlbreve</h1>
       <p class="lead">
         Acorta enlaces sin trackers, sin analytics invasivos y sin perfiles de
-        visitantes. Código abierto, Django puro y pensado para una web pequeña,
-        seria y auditable.
+        visitantes. Código abierto, Django puro y API sencilla para herramientas
+        web que necesitan enlaces cortos sin ruido.
       </p>
       <ul class="privacy-points">
         <li>Enlaces anónimos con ruta pública /a/&lt;slug&gt;/.</li>
@@ -124,6 +124,66 @@
       </form>
     </section>
   </div>
+
+  <section class="developer-section" aria-labelledby="developer-api-title">
+    <div class="developer-copy">
+      <p class="eyebrow">API-first para desarrolladores</p>
+      <h2 id="developer-api-title">Integra enlaces cortos en dashboards, bots, CRMs o herramientas internas.</h2>
+      <p class="lead">
+        Un endpoint JSON, respuesta clara y sin perfiles de visitantes. Puedes
+        crear enlaces anónimos sin API key o usar <code>X-API-Key</code> para
+        asociarlos a tu cuenta y activar rutas con namespace.
+      </p>
+      <div class="pill-row" aria-label="Principios del servicio">
+        <span class="pill">Sin analytics invasivos</span>
+        <span class="pill">Sin perfiles de visitantes</span>
+        <span class="pill">Código abierto y auditable</span>
+        <span class="pill">Rate limiting privacy-first</span>
+      </div>
+      <p class="code-note">
+        Para <code>public_mode=namespace</code> necesitas una API key válida.
+        Sin API key, la creación usa <code>public_mode=anonymous</code>.
+      </p>
+      <div class="actions">
+        {% if request.user.is_authenticated %}
+          <a class="button secondary" href="{% url 'accounts:dashboard' %}">Ir al dashboard</a>
+        {% else %}
+          <a class="button secondary" href="{% url 'accounts:register' %}">Crear cuenta</a>
+        {% endif %}
+        <a class="button secondary" href="https://github.com/dreykdrk7/urlbreve" target="_blank" rel="noopener noreferrer" title="Audita el código tú mismo" aria-label="Audita el código tú mismo">Ver en GitHub</a>
+      </div>
+    </div>
+
+    <div class="code-stack" aria-label="Ejemplo de API">
+      <div class="code-panel">
+        <div class="code-panel-header">
+          <span>Request</span>
+          <span>POST /api/shorten/</span>
+        </div>
+        <pre><code>curl -X POST https://urlbreve.es/api/shorten/ \
+  -H "Content-Type: application/json" \
+  -d '{"destination_url":"https://example.com/article","slug":"docs-demo"}'</code></pre>
+      </div>
+
+      <div class="code-panel">
+        <div class="code-panel-header">
+          <span>Response</span>
+          <span>201 Created</span>
+        </div>
+        <pre><code>{
+  "id": 123,
+  "short_url": "https://urlbreve.es/a/docs-demo/",
+  "public_path": "/a/docs-demo/",
+  "destination_url": "https://example.com/article",
+  "title": "",
+  "public_mode": "anonymous",
+  "expires_at": null,
+  "max_clicks": 0,
+  "password_protected": false
+}</code></pre>
+      </div>
+    </div>
+  </section>
 
   <script>
     document.querySelectorAll("[data-copy]").forEach((button) => {
