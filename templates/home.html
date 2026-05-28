@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% load static %}
 
 {% block title %}urlbreve - acortador privacy-first para desarrolladores{% endblock %}
 
@@ -14,7 +13,10 @@
         web que necesitan enlaces cortos sin ruido.
       </p>
       <div class="hero-brand-card">
-        <img src="{% static 'brand/logo.png' %}" alt="urlbreve" width="689" height="362">
+        <div class="hero-brand-signal" aria-hidden="true">
+          <span>/a/slug</span>
+          <span>{ API }</span>
+        </div>
         <div class="hero-brand-copy">
           <strong>Marca ligera, código auditable</strong>
           <span>Enlaces cortos para flujos web sin perfiles de visitantes.</span>
