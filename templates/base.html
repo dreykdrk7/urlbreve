@@ -3,7 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}urlbreve{% endblock %}</title>
+  <title>{% block title %}urlbreve - acortador privacy-first para desarrolladores{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}Acorta enlaces con una API sencilla, sin analytics invasivos, sin perfiles de visitantes y con código abierto auditable.{% endblock %}">
+  <meta name="robots" content="{% block robots %}index,follow{% endblock %}">
+  <link rel="canonical" href="{% block canonical_url %}https://urlbreve.es{{ request.path }}{% endblock %}">
+  <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+  <meta property="og:site_name" content="urlbreve">
+  <meta property="og:title" content="{% block og_title %}urlbreve - acortador privacy-first para desarrolladores{% endblock %}">
+  <meta property="og:description" content="{% block og_description %}Acorta enlaces con una API sencilla, sin analytics invasivos, sin perfiles de visitantes y con código abierto auditable.{% endblock %}">
+  <meta property="og:url" content="{% block og_url %}https://urlbreve.es{{ request.path }}{% endblock %}">
+  <meta name="twitter:card" content="{% block twitter_card %}summary{% endblock %}">
+  <meta name="twitter:title" content="{% block twitter_title %}urlbreve - acortador privacy-first para desarrolladores{% endblock %}">
+  <meta name="twitter:description" content="{% block twitter_description %}Acorta enlaces con una API sencilla, sin analytics invasivos, sin perfiles de visitantes y con código abierto auditable.{% endblock %}">
   <style>
     :root {
       color-scheme: light;
