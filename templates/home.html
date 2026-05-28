@@ -4,7 +4,7 @@
 
 {% block content %}
   <div class="home-grid">
-    <section>
+    <section class="home-intro">
       <p class="eyebrow">Acortador privacy-first</p>
       <h1>urlbreve</h1>
       <p class="lead">
@@ -41,7 +41,7 @@
       </div>
     </section>
 
-    <section class="panel" aria-labelledby="quick-shortener-title">
+    <section class="panel quick-panel" aria-labelledby="quick-shortener-title">
       <h1 id="quick-shortener-title">Crear enlace anónimo</h1>
       <p class="lead">
         No tendrás panel ni recuperación posterior para este enlace.
@@ -128,7 +128,7 @@
   <section class="developer-section" aria-labelledby="developer-api-title">
     <div class="developer-copy">
       <p class="eyebrow">API-first para desarrolladores</p>
-      <h2 id="developer-api-title">Integra enlaces cortos en dashboards, bots, CRMs o herramientas internas.</h2>
+      <h2 id="developer-api-title">Enlaces cortos para dashboards, bots, CRMs y herramientas internas.</h2>
       <p class="lead">
         Un endpoint JSON, respuesta clara y sin perfiles de visitantes. Puedes
         crear enlaces anónimos sin API key o usar <code>X-API-Key</code> para
@@ -160,9 +160,13 @@
           <span>Request</span>
           <span>POST /api/shorten/</span>
         </div>
-        <pre><code>curl -X POST https://urlbreve.es/api/shorten/ \
+        <pre><code>curl -X POST \
+  https://urlbreve.es/api/shorten/ \
   -H "Content-Type: application/json" \
-  -d '{"destination_url":"https://example.com/article","slug":"docs-demo"}'</code></pre>
+  -d '{
+    "destination_url": "https://example.com/article",
+    "slug": "docs-demo"
+  }'</code></pre>
       </div>
 
       <div class="code-panel">
